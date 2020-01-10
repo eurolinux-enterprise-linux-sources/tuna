@@ -1,0 +1,25 @@
+From a6740937fce401c0001ed3e56824d03bcf937668 Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Wed, 13 Nov 2013 15:21:28 +0100
+Subject: [PATCH 2/2] spec: Update the Source in tuna.spec Signed-off-by: John
+ Kacur <jkacur@redhat.com>
+
+---
+ rpm/SPECS/tuna.spec | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/rpm/SPECS/tuna.spec b/rpm/SPECS/tuna.spec
+index 78322e2..cff16cb 100644
+--- a/rpm/SPECS/tuna.spec
++++ b/rpm/SPECS/tuna.spec
+@@ -8,6 +8,7 @@ License: GPLv2
+ Summary: Application tuning GUI & command line utility
+ Group: Applications/System
+ Source: http://userweb.kernel.org/~acme/tuna/%{name}-%{version}.tar.bz2
++# Actual Source is https://git.kernel.org/cgit/utils/tuna/tuna.git
+ URL: http://userweb.kernel.org/~acme/tuna/
+ BuildArch: noarch
+ BuildRequires: python-devel, gettext
+-- 
+1.8.1.4
+

@@ -1,0 +1,29 @@
+From 088cb5376ae88a6bd5dc4d6a13f0cb26708cb235 Mon Sep 17 00:00:00 2001
+From: Petr Oros <poros@redhat.com>
+Date: Thu, 15 Aug 2013 11:15:45 +0200
+Subject: [PATCH 1/2] CLI: fix ps_show_thread call with bad args count
+
+Signed-off-by: Petr Oros <poros@redhat.com>
+(cherry picked from commit a97f70eb407f3ec2972740ca5ab976f5f06ce0bb)
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna-cmd.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tuna-cmd.py b/tuna-cmd.py
+index 460b135..8f9320b 100755
+--- a/tuna-cmd.py
++++ b/tuna-cmd.py
+@@ -216,7 +216,7 @@ def ps_show_thread(pid, affect_children, ps,
+ 		for tid in ps[pid]["threads"].keys():
+ 			ps_show_thread(tid, False, ps[pid]["threads"],
+ 				       has_ctxt_switch_info,
+-				       sock_inodes, sock_inode_re)
++				       sock_inodes, sock_inode_re, cgroups)
+ 			
+ 
+ def ps_show(ps, affect_children, thread_list, cpu_list,
+-- 
+1.8.1.4
+

@@ -1,0 +1,230 @@
+#!/bin/bash
+# Regression tests for tuna
+# (c) 2008 Red Hat Inc.
+# Arnaldo Carvalho de Melo <acme@redhat.com>
+# Released under the GPLv2
+
+dprint() {
+	[ -n "$VERBOSE" ] && echo $1
+}
+
+ktpidof() {
+	echo $(ps ax -To pid,cmd | grep "\[$1.*\]" | head -1 | cut -d'[' -f 1)
+}
+
+get_rtprio() {
+	echo $(chrt -p $1 | grep priority | cut -d ':' -f 2)
+}
+
+get_policy() {
+	echo $(chrt -p $1 | grep policy | cut -d ':' -f 2)
+}
+
+get_affinity() {
+	echo $(taskset -p $1 | grep 'current affinity' | cut -d ':' -f 2)
+}
+
+get_nr_processors() {
+	echo $(grep -i "^processor.*: " /proc/cpuinfo | tail -1 | cut -d ':' -f 2)
+}
+
+get_nr_cpu_sockets() {
+	echo $(grep "^physical id" /proc/cpuinfo | cut -d: -f2 | sort -u | wc -l)
+}
+
+die() {
+	[ -z "$VERBOSE" ] && echo -n "$2: "
+	echo $1
+	rtctl --file $INITIAL reset
+	taskset -p $INITIAL_INIT_AFFINITY 1 > /dev/null
+	rm -rf $TESTUNA_DIR
+	exit 1
+}
+
+die_with_a_diff() {
+	[ -n "$VERBOSE" ] && diff -u $INITIAL $NEW
+	die "$1"
+}
+
+tuna_save() {
+	tuna --save $TEMPCONF
+	grep -v '^# rtctl --file ' $TEMPCONF > $1
+	rm -f $TEMPCONF
+}
+
+die_if_not_saved() {
+	dprint "$2"
+	tuna_save $NEW
+	(diff -u $INITIAL $NEW | diffstat | \
+	grep -q "[ \t]*1 file changed, $1 insertions*(+), $1 deletions*(-)") ||
+	die_with_a_diff 'FAILED!' "$2"
+}
+
+die_if_conf_changed() {
+	dprint "$1"
+	tuna_save $NEW
+	diff -qu $INITIAL $NEW > /dev/null || die_with_a_diff 'FAILED!' "$1":
+}
+
+die_if_zero() {
+	dprint "$2"
+	[ $1 -eq 0 ] && die 'FAILED!' "$2"
+}
+
+die_if_not_zero() {
+	dprint "$2"
+	[ $1 -ne 0 ] && die 'FAILED!' "$2"
+}
+
+die_if_not_equal() {
+	dprint "$3"
+	[ $1 -ne $2 ] && die 'FAILED!' "$3"
+}
+
+die_if_not_str_equal() {
+	dprint "$3"
+	[ $1 != $2 ] && die 'FAILED!' "$3"
+}
+
+TESTUNA_DIR=$(mktemp -d -t testuna.XXXXXX) || exit 1
+INITIAL=$TESTUNA_DIR/initial.tuna
+INITIAL_INIT_AFFINITY=$(get_affinity 1)
+TEMPCONF=$TESTUNA_DIR/tempnew.tuna
+NEW=$TESTUNA_DIR/new.tuna
+
+[ $# -eq 1 ] && VERBOSE=1
+
+dprint "Saving initial configuration"
+
+tuna_save $INITIAL
+
+TUNA_RPM_VERSION=$(rpm -q --qf "%{version}\n" tuna)
+TUNA_BIN_VERSION=$(tuna --version)
+die_if_not_str_equal "$TUNA_RPM_VERSION" "$TUNA_BIN_VERSION" \
+	"Verifying --version ($TUNA_BIN_VERSION) matches package version ($TUNA_RPM_VERSION)"
+
+rtctl --file $INITIAL reset
+
+die_if_conf_changed "Replaying initial config"
+
+PID=$(ktpidof "watchdog")
+RTPRIO=$(get_rtprio $PID)
+POLICY=$(get_policy $PID)
+POLICY=$(echo ${POLICY:6:1} | tr 'A-Z' 'a-z')
+chrt -$POLICY -p $((RTPRIO - 1)) $PID 
+
+die_if_not_saved 1 'Saving changes to a kernel thread priority'
+
+chrt -$POLICY -p $RTPRIO $PID 
+
+die_if_conf_changed 'Restoring kernel thread priority'
+
+new_policy=$(echo $POLICY | tr fr rf)
+
+chrt -$new_policy -p $RTPRIO $PID 
+
+die_if_not_saved 1 'Changing kernel thread sched policy'
+
+chrt -$POLICY -p $RTPRIO $PID 
+
+die_if_conf_changed 'Restoring kernel thread sched policy'
+
+PID=$(ktpidof "kthreadd")
+AFFINITY=$(get_affinity $PID)
+
+taskset -p 0x2 $PID > /dev/null
+
+die_if_not_saved 1 'Changing kernel thread SMP affinity mask'
+
+taskset -p $AFFINITY $PID > /dev/null
+
+die_if_conf_changed 'Restoring kernel thread SMP affinity mask'
+
+NR_PROCESSORS=$(get_nr_processors)
+for PROCESSOR in $(seq 0 $NR_PROCESSORS) ; do
+	taskset -p 0xff 1 > /dev/null
+
+	PROCESSOR_AFFINITY=$(printf "%#x\n" $((1 << PROCESSOR)))
+	tuna --cpu $PROCESSOR --isolate
+
+	AFFINITY=0x$(get_affinity 1)
+
+	die_if_not_zero $((AFFINITY & PROCESSOR_AFFINITY)) "Isolating CPU $PROCESSOR"
+
+	tuna --cpu $PROCESSOR --include
+
+	AFFINITY=0x$(get_affinity 1)
+
+	die_if_zero $((AFFINITY & PROCESSOR_AFFINITY)) "Including CPU $PROCESSOR"
+done
+
+NEW_AFFINITY=$((1 << NR_PROCESSORS | 1))
+
+if [ $NR_PROCESSORS -gt 2 ]; then
+	tuna --cpu=0,$NR_PROCESSORS --isolate
+
+	for PID in $(cd /proc; ls -d [0-9]*) ; do
+		[ -n "$(cat /proc/$PID/cmdline 2> /dev/null)" ] || continue
+		AFFINITY=0x$(get_affinity $PID) || continue
+
+		die_if_not_zero $((AFFINITY & NEW_AFFINITY)) \
+			"Verifying isolation of first and last processor for PID $PID"
+	done
+fi
+
+tuna --cpu=0,$NR_PROCESSORS --include
+
+AFFINITY=0x$(get_affinity 1)
+
+die_if_not_equal $((AFFINITY & NEW_AFFINITY)) $NEW_AFFINITY "Including first and last processor"
+
+taskset -p 0xff 1 > /dev/null
+
+NEW_AFFINITY=$((1 << NR_PROCESSORS | 1))
+
+tuna --cpu=0,$NR_PROCESSORS --thread 1 --move
+
+AFFINITY=0x$(get_affinity 1)
+
+die_if_not_equal $((AFFINITY & NEW_AFFINITY)) $NEW_AFFINITY "Moving init to just first and last processor"
+
+NR_CPU_SOCKETS=$(get_nr_cpu_sockets)
+if [ $NR_CPU_SOCKETS -ge 2 ]; then
+	CPU1_SIBLINGS=$(printf "%d" 0x$(cat /sys/devices/system/cpu/cpu1/topology/core_siblings | cut -d',' -f2))
+	CPU1_SOCKET=$(cat /sys/devices/system/cpu/cpu1/topology/physical_package_id)
+
+	tuna --sockets=$CPU1_SOCKET --isolate
+	AFFINITY=0x$(get_affinity 1)
+	die_if_not_zero $((AFFINITY & CPU1_SIBLINGS)) \
+		"Verifying isolation of socket $CPU1_SOCKET"
+
+	tuna --sockets=$CPU1_SOCKET --include
+	AFFINITY=0x$(get_affinity 1)
+	die_if_not_equal $((AFFINITY & CPU1_SIBLINGS)) $CPU1_SIBLINGS \
+		"Verifying inclusion of socket $CPU1_SOCKET"
+
+	tuna --sockets=$CPU1_SOCKET --isolate
+	tuna --sockets=$CPU1_SOCKET --thread 1 --move
+	AFFINITY=0x$(get_affinity 1)
+	die_if_not_equal $((AFFINITY & CPU1_SIBLINGS)) $CPU1_SIBLINGS "Moving init to CPU socket $CPU1_SOCKET"
+fi
+
+if [ $NR_PROCESSORS -gt 2 ]; then
+	THREAD_PREFIX="watchdog/"
+	PID=$(ps h -C ${THREAD_PREFIX}0 -o pid)
+	RTPRIO=$(get_rtprio $PID)
+	NEW_RTPRIO=$((RTPRIO - 1))
+	tuna -t $THREAD_PREFIX* -p $NEW_RTPRIO
+	for CPU in $(seq 0 $((NR_PROCESSORS - 1))); do
+		PID=$(ps h -C ${THREAD_PREFIX}$CPU -o pid)
+		RTPRIO=$(get_rtprio $PID)
+		die_if_not_equal $RTPRIO $NEW_RTPRIO "Using --thread globbing"
+	done
+fi
+
+taskset -p $INITIAL_INIT_AFFINITY 1 > /dev/null
+rtctl --file $INITIAL reset
+
+echo 'PASS: Healthy tuna, no lead found, eat!'
+
+exit 0

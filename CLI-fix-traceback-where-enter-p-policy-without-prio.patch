@@ -1,0 +1,37 @@
+From 343d6a0237ed42a26f6968b9728cb9827d1bb3e0 Mon Sep 17 00:00:00 2001
+From: Petr Oros <poros@redhat.com>
+Date: Fri, 29 Nov 2013 12:01:14 +0100
+Subject: [PATCH] CLI: fix traceback where enter -p policy without prio
+
+Bugzilla: 1035795
+
+Signed-off-by: Petr Oros <poros@redhat.com>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/tuna.py | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index a9dab14290a6..b1194cf96964 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -471,10 +471,14 @@ def thread_set_priority(tid, policy, rtprio):
+ 
+ def threads_set_priority(tids, parm, affect_children = False):
+ 	parms = parm.split(":")
++	rtprio = -1
+ 	policy = None
+-	if len(parms) != 1:
++	if parms[0].upper() in ["OTHER", "BATCH", "IDLE", "FIFO", "RR", "IDLE", "RESET_ON_FORK"]:
+ 		policy = schedutils.schedfromstr("SCHED_%s" % parms[0].upper())
+-		rtprio = int(parms[1])
++		if len(parms) > 1:
++			rtprio = int(parms[1])
++		else:
++			rtprio = 0
+ 	else:
+ 		rtprio = int(parms[0])
+ 
+-- 
+1.8.1.4
+
