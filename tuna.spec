@@ -3,7 +3,7 @@
 
 Name: tuna
 Version: 0.10.4
-Release: 7%{?dist}
+Release: 4%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
@@ -13,9 +13,6 @@ URL: http://userweb.kernel.org/~acme/tuna/
 
 Patch1: CLI-fix-ps_show_thread-call-with-bad-args-count.patch
 Patch2: spec-Update-the-Source-in-tuna.spec.patch
-Patch3: procview-Added-column-for-SystemD-CGroup-monitoring.patch
-Patch4: tuna-cmd-New-command-line-params-for-tuning-profiles.patch
-Patch5: CLI-fix-traceback-where-enter-p-policy-without-prio.patch
 
 BuildArch: noarch
 BuildRequires: python-devel, gettext
@@ -55,9 +52,6 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %setup -q
 %patch1 -p1
 %patch2 -p1
-%patch3 -p1
-%patch4 -p1
-%patch5 -p1
 
 %build
 %{__python} setup.py build
@@ -102,24 +96,13 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
-* Mon Aug 25 2014 John Kacur <jkacur@redhat.com> - 0.10.4-7
-- CLI-fix-traceback-where-enter-p-policy-without-prio.patch
-- Resolves: rhbz#1035795
+* Fri Nov 15 2013 John Kacur <jkacur@redhat.com> - 0.10.4-4
+- Spe changes, to explicitly use separate patches from upstream
+- Resolves: rhbz#964963
 
-* Thu Mar 27 2014 John Kacur <jkacur@redhat.com> - 0.10.4-5
-- CLI: fix traceback where enter -p policy without prio (1035795)
-- tuna-cmd: New command line params for tuning profiles
-- Resolves: rhbz#1059685
-- Resolves: rhbz#1035795
-
-* Thu Dec 05 2013 John Kacur <jkacur@redhat.com> - 0.10.4-4
-- Rebuilt for rhel6.6
-- spec: Explicitly use separate patches for non-upstream changes
-- Resolves: rhbz#1029591
-
-* Fri May 17 2013 John Kacur <jkacur@redhat.com> - 0.10.4-3
-- Rebuilt for rhel6.5
-- Resolves: rhbz#957855
+* Fri May 31 2013 John Kacur <jkacur@redhat.com> - 0.10.3-3
+- Added tuna: Catch OSError exceptions from python-schedutils
+- Resolves: rhbz#964963
 
 * Fri Sep 14 2012 John Kacur <jkacur@redhat.com> - 0.10.3-2
 - Rebuilt for rhel6.4

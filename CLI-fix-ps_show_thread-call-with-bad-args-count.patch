@@ -1,7 +1,7 @@
 From 088cb5376ae88a6bd5dc4d6a13f0cb26708cb235 Mon Sep 17 00:00:00 2001
 From: Petr Oros <poros@redhat.com>
 Date: Thu, 15 Aug 2013 11:15:45 +0200
-Subject: [PATCH 1/2] CLI: fix ps_show_thread call with bad args count
+Subject: [PATCH 2/3] CLI: fix ps_show_thread call with bad args count
 
 Signed-off-by: Petr Oros <poros@redhat.com>
 (cherry picked from commit a97f70eb407f3ec2972740ca5ab976f5f06ce0bb)
