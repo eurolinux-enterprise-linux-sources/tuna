@@ -1,0 +1,45 @@
+From 80776311c89430966e729989f790cbc13fb4ccaa Mon Sep 17 00:00:00 2001
+From: Arnaldo Carvalho de Melo <acme@redhat.com>
+Date: Wed, 29 Apr 2015 11:26:45 -0300
+Subject: [PATCH 2/8] tuna config: Fix pygtk import
+
+We should 'import gtk', not 'import pygtk', fixes bugs when the error
+paths try to use gtk.messageDialog():
+
+[root@ssdandy tuna]# tuna
+Traceback (most recent call last):
+  File "/home/acme/git/tuna/tuna-cmd.py", line 654, in <module>
+    main()
+  File "/home/acme/git/tuna/tuna-cmd.py", line 648, in main
+    app = tuna_gui.main_gui(kthreads, uthreads, cpus_filtered)
+  File "/home/acme/git/tuna/tuna/tuna_gui.py", line 64, in __init__
+    self.profileview.init_default_file()
+  File "/home/acme/git/tuna/tuna/gui/profileview.py", line 141, in
+init_default_file
+    not self.config.load(self.config.config['lastfile']):
+  File "/home/acme/git/tuna/tuna/config.py", line 48, in load
+    if(self.tuned2Tuna(profileName) < 0):
+  File "/home/acme/git/tuna/tuna/config.py", line 66, in tuned2Tuna
+    dialog = gtk.MessageDialog(None, 0, gtk.MESSAGE_ERROR,\
+NameError: global name 'gtk' is not defined
+[root@ssdandy tuna]#
+
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ tuna/config.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tuna/config.py b/tuna/config.py
+index 77cc4d800c03..7e19a28f967f 100644
+--- a/tuna/config.py
++++ b/tuna/config.py
+@@ -1,5 +1,5 @@
+ import io, os, re, fnmatch
+-import sys, pygtk
++import sys, gtk
+ import codecs, ConfigParser
+ from time import localtime, strftime
+ from subprocess import Popen, PIPE, STDOUT, call
+-- 
+2.4.3
+

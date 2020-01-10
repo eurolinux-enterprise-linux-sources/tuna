@@ -1,0 +1,60 @@
+From dc51103e9ad46d20cbe417b103309d5f37228e88 Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Thu, 10 Dec 2015 15:14:18 +0100
+Subject: [PATCH 3/3] tuna: print an error message when sched_setaffinity
+ returns EINVAL
+
+When you attempt to move a thread that cannot be moved,
+schedutils.sched_setaffinity() throws an EINVAL OSError exception. tuna
+does not capture this, so the command exits with a Python traceback
+instead of an error message.
+
+eg:
+
+tuna --cpus=0 --threads=migration/1 --move
+Traceback (most recent call last):
+  File "/bin/tuna", line 656, in <module>
+    main()
+  File "/bin/tuna", line 572, in main
+    spread = spread)
+  File "/usr/lib/python2.7/site-packages/tuna/tuna.py", line 265, in
+move_threads_to_cpu
+    raise e
+OSError: [Errno 22] Invalid argument
+
+This change handles that situation and exits more gracefully with
+an error message like this
+
+tuna --cpus=0 --threads="migration/1" --move
+thread 14 cannot be moved as requested
+
+or with multiple threads
+
+tuna --cpus=0 --threads="migration/*" --move
+thread 28 cannot be moved as requested
+thread 21 cannot be moved as requested
+thread 14 cannot be moved as requested
+
+Reported-by: Guy Streeter <streeter@redhat.com>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/tuna.py | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 3c30f03ea134..661f6f166266 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -262,6 +262,9 @@ def move_threads_to_cpu(cpus, pid_list, set_affinity_warning = None,
+ 			if e[0] == 3:
+ 				# process died
+ 				continue
++			elif e[0] == 22: # (22, EINVAL - unmovable thread)
++				print "thread %(pid)d cannot be moved as requested" %{'pid':pid}
++				continue
+ 			raise e
+ 	return changed
+ 
+-- 
+2.4.3
+

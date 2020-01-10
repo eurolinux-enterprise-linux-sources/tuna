@@ -2,7 +2,7 @@
 %{!?python_ver: %define python_ver %(%{__python} -c "import sys ; print sys.version[:3]")}
 
 Name: tuna
-Version: 0.10.4
+Version: 0.12
 Release: 1%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
@@ -52,12 +52,18 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %install
 rm -rf %{buildroot}
 %{__python} setup.py install --skip-build --root %{buildroot}
+mkdir -p %{buildroot}/%{_sysconfdir}/tuna/
 mkdir -p %{buildroot}/{%{_bindir},%{_datadir}/tuna/help/kthreads,%{_mandir}/man8}
+mkdir -p %{buildroot}/%{_datadir}/polkit-1/actions/
 install -p -m644 tuna/tuna_gui.glade %{buildroot}/%{_datadir}/tuna/
 install -p -m755 tuna-cmd.py %{buildroot}/%{_bindir}/tuna
 install -p -m755 oscilloscope-cmd.py %{buildroot}/%{_bindir}/oscilloscope
 install -p -m644 help/kthreads/* %{buildroot}/%{_datadir}/tuna/help/kthreads/
 install -p -m644 docs/tuna.8 %{buildroot}/%{_mandir}/man8/
+install -p -m644 etc/tuna/example.conf %{buildroot}/%{_sysconfdir}/tuna/
+install -p -m644 etc/tuna.conf %{buildroot}/%{_sysconfdir}/
+install -p -m644 org.tuna.policy %{buildroot}/%{_datadir}/polkit-1/actions/
+desktop-file-install --dir=%{buildroot}/%{_datadir}/applications tuna.desktop
 
 # l10n-ed message catalogues
 for lng in `cat po/LINGUAS`; do
@@ -81,6 +87,10 @@ rm -rf %{buildroot}
 %{_datadir}/tuna/
 %{python_sitelib}/tuna/
 %{_mandir}/man8/tuna.8*
+%{_sysconfdir}/tuna.conf
+%{_sysconfdir}/tuna/*
+%{_datadir}/polkit-1/actions/org.tuna.policy
+%{_datadir}/applications/tuna.desktop
 
 %files -n oscilloscope
 %defattr(-,root,root,-)

@@ -2,19 +2,38 @@
 # -*- coding: utf-8 -*-
 
 import copy, ethtool, os, procfs, re, schedutils
-import help
+import help, fnmatch
 
 try:
 	set
 except NameError:
 	from sets import Set as set
 
+try:
+	fntable
+except NameError:
+	fntable = []
 
 def kthread_help(key):
 	if '/' in key:
 		key = key[:key.rfind('/')+1]
 	return help.KTHREAD_HELP.get(key, " ")
 
+def proc_sys_help(key):
+	if not len(fntable):
+		regMatch = ['[', '*', '?']
+		for value in help.PROC_SYS_HELP:
+			for char in regMatch:
+				if char in value:
+					fntable.append(value)
+	temp = help.PROC_SYS_HELP.get(key, "")
+	if len(temp):
+		return key + ":\n" + temp
+	else:
+		for value in fntable:
+			if fnmatch.fnmatch(key, value):
+				return key + ":\n" + help.PROC_SYS_HELP.get(value, "")
+		return key
 
 def kthread_help_plain_text(pid, cmdline):
 	cmdline = cmdline.split(' ')[0]
@@ -471,12 +490,19 @@ def thread_set_priority(tid, policy, rtprio):
 
 def threads_set_priority(tids, parm, affect_children = False):
 	parms = parm.split(":")
+	rtprio = 0
 	policy = None
-	if len(parms) != 1:
+	if parms[0].upper() in ["OTHER", "BATCH", "IDLE", "FIFO", "RR"]:
 		policy = schedutils.schedfromstr("SCHED_%s" % parms[0].upper())
-		rtprio = int(parms[1])
-	else:
+		if len(parms) > 1:
+			rtprio = int(parms[1])
+		elif parms[0].upper() in ["FIFO", "RR"]:
+			rtprio = 1
+	elif parms[0].isdigit():
 		rtprio = int(parms[0])
+	else:
+		print "tuna: " + _("\"%s\" is unsupported priority value!") % parms[0]
+		return
 
 	for tid in tids:
 		try:

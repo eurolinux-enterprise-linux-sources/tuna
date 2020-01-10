@@ -1,0 +1,80 @@
+From 29fbb6e82357c87be652c6717ef52d808ec0af78 Mon Sep 17 00:00:00 2001
+From: Arnaldo Carvalho de Melo <acme@felicio.ghostprotocols.net>
+Date: Tue, 9 Jun 2015 16:08:44 -0300
+Subject: [PATCH 4/8] tuna: Decide whether to isolate a thread based on
+ PF_NO_SETAFFINITY
+
+We were avoiding moving kernel threads, for isolation purposes it is better
+to check /perf/PID/stat's 'flag' big mask for PF_NO_SETAFFINITY instead.
+
+Requested-by: Luiz Capitulino <lcapitulino@redhat.com>
+Cc: Clark Williams <williams@redhat.com>
+Cc: Guy Streeter <streeter@redhat.com>
+Cc: Jeremy Eder <jeder@redhat.com>
+Cc: Jiri Kastner <jkastner@redhat.com>
+Cc: John Kacur <jkacur@redhat.com>
+Cc: Marcelo Tosatti <mtosatti@redhat.com>
+Signed-off-by: Arnaldo Carvalho de Melo <acme@felicio.ghostprotocols.net>
+---
+ tuna/tuna.py | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 0efa84fdf314..6cd6bddd2137 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -171,6 +171,15 @@ def is_hardirq_handler(self, pid):
+                 return int(self.processes[pid]["stat"]["flags"]) & \
+                        PF_HARDIRQ and True or False
+ 
++# FIXME: move to python-linux-procfs
++def cannot_set_affinity(self, pid):
++		PF_NO_SETAFFINITY = 0x04000000
++		try:
++			return int(self.processes[pid]["stat"]["flags"]) & \
++				PF_NO_SETAFFINITY and True or False
++		except:
++			return True
++
+ def move_threads_to_cpu(cpus, pid_list, set_affinity_warning = None,
+ 			spread = False):
+ 	changed = False
+@@ -325,7 +334,7 @@ def isolate_cpus(cpus, nr_cpus):
+ 	ps.reload_threads()
+ 	previous_pid_affinities = {}
+ 	for pid in ps.keys():
+-		if iskthread(pid):
++		if cannot_set_affinity(ps, pid):
+ 			continue
+ 		try:
+ 			affinity = schedutils.get_affinity(pid)
+@@ -347,7 +356,7 @@ def isolate_cpus(cpus, nr_cpus):
+ 			continue
+ 		threads = ps[pid]["threads"]
+ 		for tid in threads.keys():
+-			if iskthread(tid):
++			if cannot_set_affinity(ps, tid):
+ 				continue
+ 			try:
+ 				affinity = schedutils.get_affinity(tid)
+@@ -393,7 +402,7 @@ def include_cpus(cpus, nr_cpus):
+ 	ps.reload_threads()
+ 	previous_pid_affinities = {}
+ 	for pid in ps.keys():
+-		if iskthread(pid):
++		if cannot_set_affinity(ps, pid):
+ 			continue
+ 		try:
+ 			affinity = schedutils.get_affinity(pid)
+@@ -415,7 +424,7 @@ def include_cpus(cpus, nr_cpus):
+ 			continue
+ 		threads = ps[pid]["threads"]
+ 		for tid in threads.keys():
+-			if iskthread(tid):
++			if cannot_set_affinity(ps, tid):
+ 				continue
+ 			try:
+ 				affinity = schedutils.get_affinity(tid)
+-- 
+2.4.3
+

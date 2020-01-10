@@ -6,12 +6,15 @@ tuna/help.py
 tuna/sysfs.py
 tuna/oscilloscope.py
 tuna/tuna.py
+tuna/config.py
 tuna/tuna_gui.py
 tuna/tuna_gui.glade
 tuna/gui/__init__.py
 tuna/gui/cpuview.py
 tuna/gui/irqview.py
 tuna/gui/procview.py
+tuna/gui/commonview.py
+tuna/gui/profileview.py
 tuna/gui/util.py
 setup.py
 rpm/SPECS/tuna.spec

@@ -1,7 +1,7 @@
 From a6740937fce401c0001ed3e56824d03bcf937668 Mon Sep 17 00:00:00 2001
 From: John Kacur <jkacur@redhat.com>
 Date: Wed, 13 Nov 2013 15:21:28 +0100
-Subject: [PATCH] spec: Update the Source in tuna.spec Signed-off-by: John
+Subject: [PATCH 2/2] spec: Update the Source in tuna.spec Signed-off-by: John
  Kacur <jkacur@redhat.com>
 
 ---

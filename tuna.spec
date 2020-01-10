@@ -2,8 +2,8 @@
 %{!?python_ver: %define python_ver %(%{__python} -c "import sys ; print sys.version[:3]")}
 
 Name: tuna
-Version: 0.10.4
-Release: 4%{?dist}
+Version: 0.12
+Release: 3%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
@@ -11,11 +11,22 @@ Source: http://userweb.kernel.org/~acme/tuna/%{name}-%{version}.tar.bz2
 # Actual Source: https://git.kernel.org/cgit/utils/tuna/tuna.git
 URL: http://userweb.kernel.org/~acme/tuna/
 
-Patch1: CLI-fix-ps_show_thread-call-with-bad-args-count.patch
-Patch2: spec-Update-the-Source-in-tuna.spec.patch
+Patch1: spec-Update-the-Source-in-tuna.spec.patch
+Patch2: CLI-Introduce-nohz_full-N-entity.patch
+Patch3: tuna-config-Fix-pygtk-import.patch
+Patch4: tuna-Make-isolate-include-operations-affect-proc-irq.patch
+Patch5: tuna-Decide-whether-to-isolate-a-thread-based-on-PF_.patch
+Patch6: tuna-Fix-race-in-is_hardirq_handler.patch
+Patch7: CLI-Do-not-show-column-headers-when-not-outputting-t.patch
+Patch8: Fix-behavior-for-dot-inside-proc-sys-path.patch
+Patch9: Correct-a-typo-in-the-net.ipv4.ipfrag_time-help-stri.patch
+Patch10: tuna-docs-Fix-minor-spelling-error-in-the-tuna-man-p.patch
+Patch11: tuna-tuna.spec-Add-desktop-file-utils.patch
+Patch12: tuna-print-an-error-message-when-sched_setaffinity-r.patch
+Patch13: tuna-fix-the-check-of-PF_NO_SETAFFINITY-flag-for-thr.patch
 
 BuildArch: noarch
-BuildRequires: python-devel, gettext
+BuildRequires: python-devel, gettext, desktop-file-utils
 Requires: python-ethtool
 Requires: python-linux-procfs >= 0.4.5
 Requires: python-schedutils >= 0.2
@@ -35,10 +46,10 @@ installed.
 %package -n oscilloscope
 Summary: Generic graphical signal plotting tool
 Group: Applications/System
+Requires: tuna = %{version}-%{release}
 Requires: python-matplotlib
 Requires: numpy
 Requires: pygtk2
-Requires: tuna = %{version}-%{release}
 
 %description -n oscilloscope
 Plots stream of values read from standard input on the screen together with
@@ -52,6 +63,17 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %setup -q
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
+%patch4 -p1
+%patch5 -p1
+%patch6 -p1
+%patch7 -p1
+%patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
+%patch13 -p1
 
 %build
 %{__python} setup.py build
@@ -59,12 +81,18 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %install
 rm -rf %{buildroot}
 %{__python} setup.py install --skip-build --root %{buildroot}
+mkdir -p %{buildroot}/%{_sysconfdir}/tuna
 mkdir -p %{buildroot}/{%{_bindir},%{_datadir}/tuna/help/kthreads,%{_mandir}/man8}
+mkdir -p %{buildroot}/%{_datadir}/polkit-1/actions/
 install -p -m644 tuna/tuna_gui.glade %{buildroot}/%{_datadir}/tuna/
 install -p -m755 tuna-cmd.py %{buildroot}/%{_bindir}/tuna
 install -p -m755 oscilloscope-cmd.py %{buildroot}/%{_bindir}/oscilloscope
 install -p -m644 help/kthreads/* %{buildroot}/%{_datadir}/tuna/help/kthreads/
 install -p -m644 docs/tuna.8 %{buildroot}/%{_mandir}/man8/
+install -p -m644 etc/tuna/example.conf %{buildroot}/%{_sysconfdir}/tuna/
+install -p -m644 etc/tuna.conf %{buildroot}/%{_sysconfdir}/
+install -p -m644 org.tuna.policy %{buildroot}/%{_datadir}/polkit-1/actions/
+desktop-file-install --dir=%{buildroot}/%{_datadir}/applications tuna.desktop
 
 # l10n-ed message catalogues
 for lng in `cat po/LINGUAS`; do
@@ -88,6 +116,10 @@ rm -rf %{buildroot}
 %{_datadir}/tuna/
 %{python_sitelib}/tuna/
 %{_mandir}/man8/tuna.8*
+%{_sysconfdir}/tuna.conf
+%{_sysconfdir}/tuna/*
+%{_datadir}/polkit-1/actions/org.tuna.policy
+%{_datadir}/applications/tuna.desktop
 
 %files -n oscilloscope
 %defattr(-,root,root,-)
@@ -96,9 +128,52 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
-* Fri Nov 15 2013 John Kacur <jkacur@redhat.com> - 0.10.4-4
-- Specfile changes, to explicitly use separate patches from upstream
-- Resolves: rhbz#957855
+* Fri Dec 18 2015 John Kacur - 0.12-3
+- fix the check of PF_NO_SETAFFINITY flag for threads
+- Resolves: rhbz#1292537
+
+* Wed Dec 16 2015 John Kacur <jkacur@redhat.com> - 0.12-2
+- A few minor fixes to the man page
+- Add a BuildRequires of the desktop-file-utils
+- print an error msg when sched_setaffinity returns EINVAL
+- specfile changes to ensure all the config files are properly installed
+- Resolves: rhbz#1291811
+
+* Wed Nov 11 2015 John Kacur <jkacur@redhat.com> - 0.12-1
+- Update to tuna-0.12, and drop patches that are included in this update.
+- Correct a typo in the net.ipv4.ipfrag_time help string
+- Fix behavior for dot inside /proc/sys/ path
+- CLI: Do not show column headers when not outputting to a tty:
+- tuna: Fix race in is_hardirq_handler
+- tuna: Decide whether to isolate a thread based on PF_NO_SETAFFINITY
+- tuna: Make --isolate/--include operations affect /proc/irq/default_smp_affinity
+- tuna config: Fix pygtk import
+- CLI: Introduce --nohz_full/-N entity
+- Resolves: rhbz#1255727
+
+* Tue Dec 16 2014 John Kacur <jkacur@redhat.com> - 0.10.4-9
+- There is still an import of tuna, but the version is unimportant
+- Readd the requires without the version release dependency.
+- Resolves: rhbz#914366
+
+* Tue Dec 16 2014 John Kacur <jkacur@redhat.com> - 0.10.4-8
+- Removed the Requires of tuna from oscilloscope in this spec file.
+- Resolves: rhbz#914366
+
+* Mon Aug 25 2014 John Kacur <jkacur@redhat.com> - 0.10.4-7
+- CLI-fix-traceback-where-enter-p-policy-without-prio.patch
+- Resolves: rhbz#1035795
+
+* Thu Mar 27 2014 John Kacur <jkacur@redhat.com> - 0.10.4-5
+- CLI: fix traceback where enter -p policy without prio (1035795)
+- tuna-cmd: New command line params for tuning profiles
+- Resolves: rhbz#1059685
+- Resolves: rhbz#1035795
+
+* Thu Dec 05 2013 John Kacur <jkacur@redhat.com> - 0.10.4-4
+- Rebuilt for rhel6.6
+- spec: Explicitly use separate patches for non-upstream changes
+- Resolves: rhbz#1029591
 
 * Fri May 17 2013 John Kacur <jkacur@redhat.com> - 0.10.4-3
 - Rebuilt for rhel6.5

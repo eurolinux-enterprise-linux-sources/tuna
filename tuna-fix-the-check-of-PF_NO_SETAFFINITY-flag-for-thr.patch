@@ -1,0 +1,99 @@
+From 95c4e2ad2603cd29af1357c0ceb780da8dc161cc Mon Sep 17 00:00:00 2001
+From: Daniel Bristot de Oliveira <bristot@redhat.com>
+Date: Fri, 27 Nov 2015 16:36:54 -0200
+Subject: [PATCH] tuna: fix the check of PF_NO_SETAFFINITY flag for threads
+
+Tuna checks if PF_NO_SETAFFINITY is set on /proc/PID/stat's 'flag' field
+to verify if it is possible to migrate a process/thread.  This is
+working fine for process, but not for threads.
+
+For threads, the file /proc/TID/stat is being checked, but this file
+does not exist as the stat file of a thread is at
+/proc/PID/task/TID/stat.  Hence, the check was failing and threads were
+not being migrated.
+
+This patch adds a function to check thread's stat file, and this
+function is called to verify the PF_NO_SETAFFINITY flag for threads.
+
+Committer note:
+
+Before, doing:
+
+  # tuna --cpu 3 --isolate
+  # tuna -t firefox -CP
+                      thread       ctxt_switches
+      pid SCHED_ rtpri affinity voluntary nonvoluntary             cmd
+   14838   OTHER     0    0,1,2    873954        27498         firefox
+    14857  OTHER     0  0,1,2,3         3            1  Gecko_IOThread
+    14858  OTHER     0  0,1,2,3         1            0    Link Monitor
+    14859  OTHER     0  0,1,2,3    126717        12214   Socket Thread
+  <SNIP>
+
+So it affected just the main thread, all the children remained with
+their existing affinity mask.
+
+After the patch:
+
+  # tuna --cpu 3 --isolate
+  # tuna -t firefox -CP
+                        thread       ctxt_switches
+      pid SCHED_ rtpri affinity voluntary nonvoluntary             cmd
+   14838   OTHER     0    0,1,2    877488        27583         firefox
+    14857  OTHER     0    0,1,2         3            1  Gecko_IOThread
+    14858  OTHER     0    0,1,2         1            0    Link Monitor
+    14859  OTHER     0    0,1,2    126933        12235   Socket Thread
+  <SNIP>
+
+Signed-off-by: Daniel Bristot de Oliveira <bristot@redhat.com>
+Tested-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: Jiri Kastner <jkastner@redhat.com>
+Cc: John Kacur <jkacur@redhat.com>
+Cc: Luiz Capitulino <lcapitulino@redhat.com>
+Cc: Tuna <tuna-devel@lists.fedorahosted.org>
+Bugzilla: https://bugzilla.redhat.com/show_bug.cgi?id=1286221
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ tuna/tuna.py | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 3c30f03ea134..1de63b07a5ee 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -181,6 +181,15 @@ def cannot_set_affinity(self, pid):
+ 		except:
+ 			return True
+ 
++# FIXME: move to python-linux-procfs
++def cannot_set_thread_affinity(self, pid, tid):
++		PF_NO_SETAFFINITY = 0x04000000
++		try:
++			return int(self.processes[pid].threads[tid]["stat"]["flags"]) & \
++				PF_NO_SETAFFINITY and True or False
++		except:
++			return True
++
+ def move_threads_to_cpu(cpus, pid_list, set_affinity_warning = None,
+ 			spread = False):
+ 	changed = False
+@@ -357,7 +366,7 @@ def isolate_cpus(cpus, nr_cpus):
+ 			continue
+ 		threads = ps[pid]["threads"]
+ 		for tid in threads.keys():
+-			if cannot_set_affinity(ps, tid):
++			if cannot_set_thread_affinity(ps, pid, tid):
+ 				continue
+ 			try:
+ 				affinity = schedutils.get_affinity(tid)
+@@ -425,7 +434,7 @@ def include_cpus(cpus, nr_cpus):
+ 			continue
+ 		threads = ps[pid]["threads"]
+ 		for tid in threads.keys():
+-			if cannot_set_affinity(ps, tid):
++			if cannot_set_thread_affinity(ps, pid, tid):
+ 				continue
+ 			try:
+ 				affinity = schedutils.get_affinity(tid)
+-- 
+2.4.3
+

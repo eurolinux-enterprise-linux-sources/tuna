@@ -1,0 +1,30 @@
+From 5d5e0e638ebf10fe7ce210db6a2ae50bfb626d71 Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Tue, 15 Dec 2015 02:33:37 +0100
+Subject: [PATCH 2/3] tuna: tuna.spec: Add desktop-file-utils
+
+The rpm spec file uses desktop-file-install during the install step.
+This is part of the desktop-file-utils package.
+This patch adds desktop-file-utils to the BuildRequires list.
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ rpm/SPECS/tuna.spec | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rpm/SPECS/tuna.spec b/rpm/SPECS/tuna.spec
+index 97d14f7fbaa6..3003af669f79 100644
+--- a/rpm/SPECS/tuna.spec
++++ b/rpm/SPECS/tuna.spec
+@@ -10,7 +10,7 @@ Group: Applications/System
+ # Actual Source is https://git.kernel.org/cgit/utils/tuna/tuna.git
+ URL: http://userweb.kernel.org/~acme/tuna/
+ BuildArch: noarch
+-BuildRequires: python-devel, gettext
++BuildRequires: python-devel, gettext, desktop-file-utils
+ Requires: python-ethtool
+ Requires: python-linux-procfs >= 0.4.5
+ Requires: python-schedutils >= 0.2
+-- 
+2.4.3
+
