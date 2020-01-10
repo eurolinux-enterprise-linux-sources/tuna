@@ -97,12 +97,12 @@ rm -rf %{buildroot}
 
 %changelog
 * Fri Nov 15 2013 John Kacur <jkacur@redhat.com> - 0.10.4-4
-- Spe changes, to explicitly use separate patches from upstream
-- Resolves: rhbz#964963
+- Specfile changes, to explicitly use separate patches from upstream
+- Resolves: rhbz#957855
 
-* Fri May 31 2013 John Kacur <jkacur@redhat.com> - 0.10.3-3
-- Added tuna: Catch OSError exceptions from python-schedutils
-- Resolves: rhbz#964963
+* Fri May 17 2013 John Kacur <jkacur@redhat.com> - 0.10.4-3
+- Rebuilt for rhel6.5
+- Resolves: rhbz#957855
 
 * Fri Sep 14 2012 John Kacur <jkacur@redhat.com> - 0.10.3-2
 - Rebuilt for rhel6.4
