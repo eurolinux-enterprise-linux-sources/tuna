@@ -3,7 +3,7 @@
 
 Name: tuna
 Version: 0.10.4
-Release: 9%{?dist}
+Release: 7%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
@@ -38,10 +38,10 @@ installed.
 %package -n oscilloscope
 Summary: Generic graphical signal plotting tool
 Group: Applications/System
-Requires: tuna
 Requires: python-matplotlib
 Requires: numpy
 Requires: pygtk2
+Requires: tuna = %{version}-%{release}
 
 %description -n oscilloscope
 Plots stream of values read from standard input on the screen together with
@@ -102,15 +102,6 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
-* Tue Dec 16 2014 John Kacur <jkacur@redhat.com> - 0.10.4-9
-- There is still an import of tuna, but the version is unimportant
-- Readd the requires without the version release dependency.
-- Resolves: rhbz#914366
-
-* Tue Dec 16 2014 John Kacur <jkacur@redhat.com> - 0.10.4-8
-- Removed the Requires of tuna from oscilloscope in this spec file.
-- Resolves: rhbz#914366
-
 * Mon Aug 25 2014 John Kacur <jkacur@redhat.com> - 0.10.4-7
 - CLI-fix-traceback-where-enter-p-policy-without-prio.patch
 - Resolves: rhbz#1035795
