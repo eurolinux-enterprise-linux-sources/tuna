@@ -1,0 +1,38 @@
+From a4fdd27814ed7b4f2f6f609a72364b581ec19bc0 Mon Sep 17 00:00:00 2001
+From: Arnaldo Carvalho de Melo <acme@felicio.ghostprotocols.net>
+Date: Tue, 9 Jun 2015 16:15:42 -0300
+Subject: [PATCH 12/15] tuna: Fix race in is_hardirq_handler
+
+It is better to try accessing the fields catching exceptions, as just
+checking if we have that key is not enough for, right after, that thread
+having gone away and the populating of that dict entry not finding the
+file on /proc/PID/.
+
+Signed-off-by: Arnaldo Carvalho de Melo <acme@felicio.ghostprotocols.net>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/tuna.py | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 6cd6bddd2137..3c30f03ea134 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -166,10 +166,11 @@ def list_to_cpustring(l):
+ # FIXME: move to python-linux-procfs
+ def is_hardirq_handler(self, pid):
+ 		PF_HARDIRQ = 0x08000000
+-		if not self.processes.has_key(pid):
++		try:
++			return int(self.processes[pid]["stat"]["flags"]) & \
++				PF_HARDIRQ and True or False
++		except:
+ 			return False
+-                return int(self.processes[pid]["stat"]["flags"]) & \
+-                       PF_HARDIRQ and True or False
+ 
+ # FIXME: move to python-linux-procfs
+ def cannot_set_affinity(self, pid):
+-- 
+1.8.3.1
+

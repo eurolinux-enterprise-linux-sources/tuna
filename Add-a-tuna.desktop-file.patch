@@ -1,0 +1,35 @@
+From 14024e0845ffdfec688f8d0cde0ee2876c1a81cd Mon Sep 17 00:00:00 2001
+From: Guy Streeter <streeter@redhat.com>
+Date: Wed, 5 Feb 2014 15:40:36 -0600
+Subject: [PATCH 07/16] Add a tuna.desktop file
+
+change the desktop icon
+
+Signed-off-by: Guy Streeter <streeter@redhat.com>
+Tested-by: Jiri Kastner <jkastner@redhat.com>
+Signed-off-by: Jiri Kastner <jkastner@redhat.com>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ rpm/SPECS/tuna.spec | 2 ++
+ tuna.desktop        | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+ create mode 100644 tuna.desktop
+
+diff --git a/tuna.desktop b/tuna.desktop
+new file mode 100644
+index 000000000000..603011f79467
+--- /dev/null
++++ b/tuna.desktop
+@@ -0,0 +1,9 @@
++[Desktop Entry]
++Name=tuna
++GenericName=Application Tuner
++Exec=tuna --gui
++Type=Application
++Terminal=false
++Comment=Thread and IRQ attribute management
++Icon=gtk-preferences
++Categories=System;Settings;
+-- 
+1.8.3.1
+

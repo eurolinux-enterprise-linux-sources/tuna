@@ -1,0 +1,1 @@
+Activated when under heavy networking activity. Used to avoid monopolizing the CPUs doing just software interrupt processing.

@@ -1,0 +1,69 @@
+From ab9221d8a494194886cdf2ebabeeb8c74d888f2e Mon Sep 17 00:00:00 2001
+From: Arnaldo Carvalho de Melo <acme@redhat.com>
+Date: Tue, 21 Oct 2014 22:47:42 -0300
+Subject: [PATCH 08/15] CLI: Introduce --nohz_full/-N entity
+
+This will set as the cpu list what was configured on the nohz_full=
+kernel command line argument, allowing isolating these CPUs and then
+moving to it some important app, i.e. all the other operations one
+can do in tuna can apply to that cpu list.
+
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna-cmd.py  | 11 +++++++++--
+ tuna/tuna.py |  4 ++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/tuna-cmd.py b/tuna-cmd.py
+index 5dcc18167d17..9edf7de6c286 100755
+--- a/tuna-cmd.py
++++ b/tuna-cmd.py
+@@ -58,6 +58,7 @@ def usage():
+ 	print fmt % ('-K, --no_kthreads',	    _('Operations will not affect kernel threads'))
+ 	print fmt % ('-m, --move',		    _('Move selected entities to %(cpulist)s') % \
+ 							{"cpulist": _('CPU-LIST')})
++	print fmt % ('-N, --nohz_full',		    _('CPUs in nohz_full= kernel command line will be affected by operations'))
+ 	if have_inet_diag:
+ 		print fmt % ('-n, --show_sockets',  _('Show network sockets in use by threads'))
+ 	print fmt % ('-p, --priority=[' +
+@@ -449,9 +450,9 @@ def main():
+ 
+ 	i18n_init()
+ 	try:
+-		short = "a:c:CfgGhiIKlmp:PQq:s:S:t:UvWx"
++		short = "a:c:CfgGhiIKlmNp:PQq:s:S:t:UvWx"
+ 		long = ["cpus=", "affect_children", "filter", "gui", "help",
+-			"isolate", "include", "no_kthreads", "move",
++			"isolate", "include", "no_kthreads", "move", "nohz_full",
+ 			"show_sockets", "priority=", "show_threads",
+ 			"show_irqs", "irqs=",
+ 			"save=", "sockets=", "threads=", "no_uthreads",
+@@ -490,6 +491,12 @@ def main():
+ 			(op, a) = pick_op(a)
+ 			op_list = tuna.cpustring_to_list(a)
+ 			cpu_list = do_list_op(op, cpu_list, op_list)
++		elif o in ("-N", "--nohz_full"):
++			try:
++				cpu_list = tuna.nohz_full_list()
++			except:
++				print "tuna: --nohz_full " + _(" needs nohz_full=cpulist on the kernel command line")
++				sys.exit(2)
+ 		elif o in ("-C", "--affect_children"):
+ 			affect_children = True
+ 		elif o in ("-G", "--cgroup"):
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 49c9eabdf499..7b839f1e2d96 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -622,3 +622,7 @@ def generate_rtgroups(filename, kthreads, nr_cpus):
+ 						   schedutils.schedstr(kt.policy)[6].lower(),
+ 						   kt.rtprio, mask, regex))
+ 	f.close()
++
++
++def nohz_full_list():
++	return [ int(cpu) for cpu in procfs.cmdline().options["nohz_full"].split(",") ]
+-- 
+1.8.3.1
+

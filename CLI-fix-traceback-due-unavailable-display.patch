@@ -1,0 +1,31 @@
+From 2db07dded58386fed39a094d60966d741430ab3d Mon Sep 17 00:00:00 2001
+From: Petr Oros <poros@redhat.com>
+Date: Wed, 4 Dec 2013 07:29:35 +0000
+Subject: [PATCH 04/15] CLI: fix traceback due unavailable display
+
+Tuna showing traceback when user haven't set DISPLAY variable and using CLI with param -l.
+This is caused by gtk library which try create "window", but in CLI mode is not neccesary.
+Patch remove unnecesary library which cause this problem
+
+Tested-by: Jiri Kastner <jkastner@redhat.com>
+Signed-off-by: Petr Oros <poros@redhat.com>
+Signed-off-by: Jiri Kastner <jkastner@redhat.com>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/config.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tuna/config.py b/tuna/config.py
+index e4464478fc2e..77cc4d800c03 100644
+--- a/tuna/config.py
++++ b/tuna/config.py
+@@ -1,5 +1,5 @@
+ import io, os, re, fnmatch
+-import sys, gtk, pygtk
++import sys, pygtk
+ import codecs, ConfigParser
+ from time import localtime, strftime
+ from subprocess import Popen, PIPE, STDOUT, call
+-- 
+1.8.3.1
+

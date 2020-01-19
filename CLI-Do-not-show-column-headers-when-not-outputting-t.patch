@@ -1,0 +1,74 @@
+From 47ea4e06b7f042fa7d8512fa8e95d513bf82c741 Mon Sep 17 00:00:00 2001
+From: Arnaldo Carvalho de Melo <acme@felicio.ghostprotocols.net>
+Date: Tue, 9 Jun 2015 16:27:30 -0300
+Subject: [PATCH 13/15] CLI: Do not show column headers when not outputting to
+ a tty:
+
+[root@felicio ~]# tuna -q en* -Q
+   # users            affinity
+  54 enp1s0f0-TxRx-0     0,1,2  ixgbe
+  55 enp1s0f0-TxRx-1     0,1,2  ixgbe
+  56 enp1s0f0-TxRx-2     0,1,2  ixgbe
+  57 enp1s0f0-TxRx-3     0,1,2  ixgbe
+  58 enp1s0f0            0,1,2  ixgbe
+  59 enp1s0f1-TxRx-0     0,1,2  ixgbe
+  60 enp1s0f1-TxRx-1     0,1,2  ixgbe
+  61 enp1s0f1-TxRx-2     0,1,2  ixgbe
+  62 enp1s0f1-TxRx-3     0,1,2  ixgbe
+  63 enp1s0f1            0,1,2  ixgbe
+  66 enp7s0              0,1,2  atl1c
+[root@felicio ~]# tuna -q en* -Q | head -4
+  54 enp1s0f0-TxRx-0     0,1,2  ixgbe
+  55 enp1s0f0-TxRx-1     0,1,2  ixgbe
+  56 enp1s0f0-TxRx-2     0,1,2  ixgbe
+  57 enp1s0f0-TxRx-3     0,1,2  ixgbe
+[root@felicio ~]#
+
+[root@felicio ~]# tuna -t xfs-d* -P
+                      thread       ctxt_switches
+    pid SCHED_ rtpri affinity voluntary nonvoluntary             cmd
+  459    OTHER     0  0,1,2,3         2            1   xfs-data/dm-1
+  654    OTHER     0  0,1,2,3         2            0   xfs-data/sda1
+  669    OTHER     0  0,1,2,3         2            0   xfs-data/dm-2
+[root@felicio ~]# tuna -t xfs-d* -P | head
+  459    OTHER     0  0,1,2,3         2            1   xfs-data/dm-1
+  654    OTHER     0  0,1,2,3         2            0   xfs-data/sda1
+  669    OTHER     0  0,1,2,3         2            0   xfs-data/dm-2
+[root@felicio ~]#
+
+Useful, for instance, when using wc to count how many IRQs or threadas match
+some filters.
+
+Signed-off-by: Arnaldo Carvalho de Melo <acme@felicio.ghostprotocols.net>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna-cmd.py | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/tuna-cmd.py b/tuna-cmd.py
+index 9edf7de6c286..ba40ec8246ba 100755
+--- a/tuna-cmd.py
++++ b/tuna-cmd.py
+@@ -305,7 +305,8 @@ def do_ps(thread_list, cpu_list, irq_list, show_uthreads,
+ 	
+ 	has_ctxt_switch_info = ps[1]["status"].has_key("voluntary_ctxt_switches")
+ 	try:
+-		ps_show_header(has_ctxt_switch_info, cgroups)
++		if sys.stdout.isatty():
++			ps_show_header(has_ctxt_switch_info, cgroups)
+ 		ps_show(ps, affect_children, thread_list,
+ 			cpu_list, irq_list, show_uthreads, show_kthreads,
+ 			has_ctxt_switch_info, sock_inodes, sock_inode_re, cgroups)
+@@ -334,7 +335,8 @@ def show_irqs(irq_list, cpu_list):
+ 	if not irqs:
+ 		irqs = procfs.interrupts()
+ 
+-	print "%4s %-16s %8s" % ("#", _("users"), _("affinity"),)
++	if sys.stdout.isatty():
++		print "%4s %-16s %8s" % ("#", _("users"), _("affinity"),)
+ 	sorted_irqs = []
+ 	for k in irqs.keys():
+ 		try:
+-- 
+1.8.3.1
+
