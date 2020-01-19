@@ -1,0 +1,53 @@
+From 6e19631d5e5e27b28e02d0a3f612b95c56e9ba4c Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Mon, 30 May 2016 12:57:44 +0200
+Subject: [PATCH] tuna: cpuview.py: Omit offline cpus in socket_ids list
+
+sysfy.py inserts None for offline cpus in class cpus, method reload, via
+class cpu method reload.
+
+This is potentially useful, so we don't want to change these classes.
+However in cpuview.py - class cpuview, we don't want to display these
+offline cpus, so we only need to recognize that the type None can be
+returned and then skip over it.
+
+This fixes Bugzilla 1036156
+First detected on some ppc
+
+./tuna-cmd.py
+Traceback (most recent call last):
+  File "./tuna-cmd.py", line 656, in <module>
+    main()
+  File "./tuna-cmd.py", line 650, in main
+    app = tuna_gui.main_gui(kthreads, uthreads, cpus_filtered)
+  File "/home/jkacur/tuna/tuna/tuna_gui.py", line 49, in __init__
+    self.procview, self.irqview, cpus_filtered)
+  File "/home/jkacur/tuna/tuna/gui/cpuview.py", line 253, in __init__
+    socket_ids = [ int(id) for id in self.cpus.sockets.keys() ]
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/gui/cpuview.py | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/tuna/gui/cpuview.py b/tuna/gui/cpuview.py
+index 41a3d9bbbfc3..c84ecd739c70 100755
+--- a/tuna/gui/cpuview.py
++++ b/tuna/gui/cpuview.py
+@@ -250,7 +250,12 @@ class cpuview:
+ 		self.irqview = irqview
+ 
+ 		vbox = window.get_child().get_child()
+-		socket_ids = [ int(id) for id in self.cpus.sockets.keys() ]
++                socket_ids = []
++                for id in self.cpus.sockets.keys():
++                    try:
++                        socket_ids.append(int(id))
++                    except TypeError: # Skip over offline cpus - type None
++                        continue
+ 		socket_ids.sort()
+ 
+ 		self.nr_sockets = len(socket_ids)
+-- 
+2.4.11
+

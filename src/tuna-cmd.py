@@ -37,7 +37,7 @@ except NameError:
 nr_cpus = None
 ps = None
 irqs = None
-version = "0.11.1"
+version = "0.13"
 
 def usage():
 	print _('Usage: tuna [OPTIONS]')
@@ -58,6 +58,7 @@ def usage():
 	print fmt % ('-K, --no_kthreads',	    _('Operations will not affect kernel threads'))
 	print fmt % ('-m, --move',		    _('Move selected entities to %(cpulist)s') % \
 							{"cpulist": _('CPU-LIST')})
+	print fmt % ('-N, --nohz_full',		    _('CPUs in nohz_full= kernel command line will be affected by operations'))
 	if have_inet_diag:
 		print fmt % ('-n, --show_sockets',  _('Show network sockets in use by threads'))
 	print fmt % ('-p, --priority=[' +
@@ -227,7 +228,7 @@ def ps_show_thread(pid, affect_children, ps,
 		for tid in ps[pid]["threads"].keys():
 			ps_show_thread(tid, False, ps[pid]["threads"],
 				       has_ctxt_switch_info,
-				       sock_inodes, sock_inode_re)
+				       sock_inodes, sock_inode_re, cgroups)
 			
 
 def ps_show(ps, affect_children, thread_list, cpu_list,
@@ -304,7 +305,8 @@ def do_ps(thread_list, cpu_list, irq_list, show_uthreads,
 	
 	has_ctxt_switch_info = ps[1]["status"].has_key("voluntary_ctxt_switches")
 	try:
-		ps_show_header(has_ctxt_switch_info, cgroups)
+		if sys.stdout.isatty():
+			ps_show_header(has_ctxt_switch_info, cgroups)
 		ps_show(ps, affect_children, thread_list,
 			cpu_list, irq_list, show_uthreads, show_kthreads,
 			has_ctxt_switch_info, sock_inodes, sock_inode_re, cgroups)
@@ -333,7 +335,8 @@ def show_irqs(irq_list, cpu_list):
 	if not irqs:
 		irqs = procfs.interrupts()
 
-	print "%4s %-16s %8s" % ("#", _("users"), _("affinity"),)
+	if sys.stdout.isatty():
+		print "%4s %-16s %8s" % ("#", _("users"), _("affinity"),)
 	sorted_irqs = []
 	for k in irqs.keys():
 		try:
@@ -449,9 +452,9 @@ def main():
 
 	i18n_init()
 	try:
-		short = "a:c:CfgGhiIKlmp:PQq:s:S:t:UvWx"
+		short = "a:c:CfgGhiIKlmNp:PQq:s:S:t:UvWx"
 		long = ["cpus=", "affect_children", "filter", "gui", "help",
-			"isolate", "include", "no_kthreads", "move",
+			"isolate", "include", "no_kthreads", "move", "nohz_full",
 			"show_sockets", "priority=", "show_threads",
 			"show_irqs", "irqs=",
 			"save=", "sockets=", "threads=", "no_uthreads",
@@ -490,6 +493,12 @@ def main():
 			(op, a) = pick_op(a)
 			op_list = tuna.cpustring_to_list(a)
 			cpu_list = do_list_op(op, cpu_list, op_list)
+		elif o in ("-N", "--nohz_full"):
+			try:
+				cpu_list = tuna.nohz_full_list()
+			except:
+				print "tuna: --nohz_full " + _(" needs nohz_full=cpulist on the kernel command line")
+				sys.exit(2)
 		elif o in ("-C", "--affect_children"):
 			affect_children = True
 		elif o in ("-G", "--cgroup"):

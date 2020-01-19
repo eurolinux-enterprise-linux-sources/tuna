@@ -1,0 +1,86 @@
+From e9a4bc14e15115e3493781fe8487fb4bd575ae9e Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Mon, 30 May 2016 20:31:37 +0200
+Subject: [PATCH] tuna: tuna-cmd: Display usage instead of traceback -c missing
+ args
+
+Display a usage messaage instead of a python traceback when a required
+argument to the -c or --cpus is missing, or when the argument doesn't
+make sense. (Such as passing a nonsense string, instead of a comma separated list of numbers)
+
+- In function pick_op, handle the unusual but possible case where an
+  empty string is passed as an argument.
+- Display a usage message upon ValueError when caling cpustring_to_list
+  when processing the -c option
+
+This fixes various erroneous or missing input to -c, such as the
+following
+
+./tuna-cmd.py -c -P
+Traceback (most recent call last):
+  File "./tuna-cmd.py", line 656, in <module>
+    main()
+  File "./tuna-cmd.py", line 494, in main
+    op_list = tuna.cpustring_to_list(a)
+  File "/home/jkacur/source/tuna/tuna/tuna.py", line 124, in
+cpustring_to_list
+    ends = [ int(a, 0) for a in field.split("-") ]
+ValueError: invalid literal for int() with base 0: 'P'
+
+./tuna-cmd.py -c "" -P
+Traceback (most recent call last):
+  File "./tuna-cmd.py", line 656, in <module>
+    main()
+  File "./tuna-cmd.py", line 493, in main
+    (op, a) = pick_op(a)
+  File "./tuna-cmd.py", line 408, in pick_op
+    if argument[0] in ('+', '-'):
+IndexError: string index out of range
+
+./tuna-cmd.py -c "nonesense" -P
+Traceback (most recent call last):
+  File "./tuna-cmd.py", line 656, in <module>
+    main()
+  File "./tuna-cmd.py", line 494, in main
+    op_list = tuna.cpustring_to_list(a)
+  File "/home/jkacur/source/tuna/tuna/tuna.py", line 124, in
+cpustring_to_list
+    ends = [ int(a, 0) for a in field.split("-") ]
+ValueError: invalid literal for int() with base 0: 'nonesense'
+
+This fixes bugzilla 1268287
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna-cmd.py | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/tuna-cmd.py b/tuna-cmd.py
+index ae4f78ab7d56..3c9bfaa50bb4 100755
+--- a/tuna-cmd.py
++++ b/tuna-cmd.py
+@@ -405,6 +405,8 @@ def irq_mapper(s):
+ 	return irq_list
+ 
+ def pick_op(argument):
++        if argument == "":
++                return (None, argument)
+ 	if argument[0] in ('+', '-'):
+ 		return (argument[0], argument[1:])
+ 	return (None, argument)
+@@ -491,7 +493,11 @@ def main():
+ 			list_config()
+ 		elif o in ("-c", "--cpus"):
+ 			(op, a) = pick_op(a)
+-			op_list = tuna.cpustring_to_list(a)
++                        try:
++			    op_list = tuna.cpustring_to_list(a)
++                        except ValueError:
++                            usage()
++                            return
+ 			cpu_list = do_list_op(op, cpu_list, op_list)
+ 		elif o in ("-N", "--nohz_full"):
+ 			try:
+-- 
+2.4.11
+

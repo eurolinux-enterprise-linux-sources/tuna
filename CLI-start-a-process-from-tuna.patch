@@ -1,0 +1,313 @@
+From d7a7671477710eca0673a54475b47a58dbf44842 Mon Sep 17 00:00:00 2001
+From: Daniel Bristot de Oliveira <daniel@bristot.me>
+Date: Thu, 25 Jun 2015 16:50:18 -0300
+Subject: [PATCH 1/2] CLI: start a process from tuna
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Currently it is possible to set the CPU affinity and sched tunables for
+threads running on a system. However, tuna does not permit to start a
+new application with these parameters set.
+
+This patch adds the ability to start a new process with its affinity
+and sched tunable set before it starts to run.
+
+To do so, one parameter was added to tuna's command line. This
+parameter is the Action -r, --run=:
+
+   -r, --run="COMMAND"
+	  Run the COMMAND. If arguments are passed, the entire com‐
+	  mand line must be provided inside "quotes". Modifiers  -c
+	  and -p can be used to set the affinity and scheduler tun‐
+	  ables of the given COMMAND. The arg[0] (i.e. the command)
+	  will  be set in THREAD-LIST. Likewise the -t, the COMMAND
+	  accepts the prefix + and - as wildcards in  order  to  be
+	  appended or removed from THREAD-LIST, respectively.
+
+The option -r will fork a new process, set the sched tunables and
+affinity, and execute the new application's binary.
+
+Tuna will wait for the new process to return, and then continue
+its execution. That means that it is possible to execute many Actions
+after the creation of a new process, including the start of many process
+in a single command line.
+
+Example of use:
+
+[root@kiron tuna]# tuna -p fifo:1 -t bash -c 1,2 -r +httpd -P
+                      thread       ctxt_switches
+    pid SCHED_ rtpri affinity voluntary nonvoluntary             cmd
+  10550  OTHER     0  0,1,2,3       300           81            bash
+  12898  OTHER     0  0,1,2,3        30            6            bash
+  12930  OTHER     0  0,1,2,3       246           27            bash
+  13022   FIFO     1      1,2         1            0           httpd
+
+In this example, the schedule policy:prio fifo:1 is saved for future
+Actions, "bash" is set in Thread list, cpus 1,2 are set in the cpulist,
+the command "httpd" is appended to the Thread list and is started.
+Finally, the threads in Thread list are printed.
+
+Signed-off-by: Daniel Bristot de Oliveira <daniel@bristot.me>
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna-cmd.py  | 98 ++++++++++++++++++++++++++++++++++++++++++++----------------
+ tuna/tuna.py | 59 ++++++++++++++++++++++++++++--------
+ 2 files changed, 119 insertions(+), 38 deletions(-)
+
+diff --git a/tuna-cmd.py b/tuna-cmd.py
+index 3c9bfaa50bb4..164fbfcfe5e0 100755
+--- a/tuna-cmd.py
++++ b/tuna-cmd.py
+@@ -69,6 +69,8 @@ def usage():
+ 	print fmt % ('-Q, --show_irqs',		    _('Show IRQ list'))
+ 	print fmt % ('-q, --irqs=' + _('IRQ-LIST'), _('%(irqlist)s affected by commands') %
+ 							{"irqlist": _('IRQ-LIST')})
++	print fmt % ('-r, --run=' + _('COMMAND'),   _('fork a new process and run the %(command)s') % \
++							{"command": _('COMMAND')})
+ 	print fmt % ('-s, --save=' + _('FILENAME'), _('Save kthreads sched tunables to %(filename)s') % \
+ 							{"filename": _('FILENAME')})
+ 	print fmt % ('-S, --sockets=' +
+@@ -377,8 +379,8 @@ def thread_mapper(s):
+ 		return [ int(s), ]
+ 	except:
+ 		pass
+-	if not ps:
+-		ps = procfs.pidstats()
++
++	ps = procfs.pidstats()
+ 
+ 	try:
+ 		return ps.find_by_regex(re.compile(fnmatch.translate(s)))
+@@ -454,13 +456,14 @@ def main():
+ 
+ 	i18n_init()
+ 	try:
+-		short = "a:c:CfgGhiIKlmNp:PQq:s:S:t:UvWx"
++		short = "a:c:CfgGhiIKlmNp:PQq:r:s:S:t:UvWx"
+ 		long = ["cpus=", "affect_children", "filter", "gui", "help",
+ 			"isolate", "include", "no_kthreads", "move", "nohz_full",
+ 			"show_sockets", "priority=", "show_threads",
+ 			"show_irqs", "irqs=",
+ 			"save=", "sockets=", "threads=", "no_uthreads",
+-			"version", "what_is", "spread","cgroup","config_file_apply=","config_file_list="]
++			"version", "what_is", "spread","cgroup","config_file_apply=","config_file_list=",
++			"run=" ]
+ 		if have_inet_diag:
+ 			short += "n"
+ 			long.append("show_sockets")
+@@ -477,11 +480,14 @@ def main():
+ 	cpu_list = None
+ 	irq_list = None
+ 	irq_list_str = None
++	rtprio = None
++	policy = None
+ 	thread_list = []
+ 	thread_list_str = None
+ 	filter = False
+ 	affect_children = False
+ 	show_sockets = False
++	p_waiting_action = False
+ 
+ 	for o, a in opts:
+ 		if o in ("-h", "--help"):
+@@ -510,20 +516,25 @@ def main():
+ 		elif o in ("-G", "--cgroup"):
+ 			cgroups = True
+ 		elif o in ("-t", "--threads"):
+-			(op, a) = pick_op(a)
+-			op_list = reduce(lambda i, j: i + j,
+-					 map(thread_mapper, a.split(",")))
+-			op_list = list(set(op_list))
+-			thread_list = do_list_op(op, thread_list, op_list)
+-			# Check if a process name was especified and no
+-			# threads was found, which would result in an empty
+-			# thread list, i.e. we would print all the threads
+-			# in the system when we should print nothing.
+-			if not op_list and type(a) == type(''):
+-				thread_list_str = do_list_op(op, thread_list_str,
+-							     a.split(","))
+-			if not op:
+-				irq_list = None
++			# The -t - will reset thread list
++			if a == '-':
++				thread_list = []
++				thread_list_str = ''
++			else:
++				(op, a) = pick_op(a)
++				op_list = reduce(lambda i, j: i + j,
++						 map(thread_mapper, a.split(",")))
++				op_list = list(set(op_list))
++				thread_list = do_list_op(op, thread_list, op_list)
++				# Check if a process name was especified and no
++				# threads was found, which would result in an empty
++				# thread list, i.e. we would print all the threads
++				# in the system when we should print nothing.
++				if not op_list and type(a) == type(''):
++					thread_list_str = do_list_op(op, thread_list_str,
++								     a.split(","))
++				if not op:
++					irq_list = None
+ 		elif o in ("-f", "--filter"):
+ 			filter = True
+ 		elif o in ("-g", "--gui"):
+@@ -539,14 +550,17 @@ def main():
+ 				sys.exit(2)
+ 			tuna.include_cpus(cpu_list, get_nr_cpus())
+ 		elif o in ("-p", "--priority"):
++			# Save policy and rtprio for future Actions (e.g. --run).
++			(policy, rtprio) = tuna.get_policy_and_rtprio(a)
+ 			if not thread_list:
+-				print ("tuna: %s " % o) + _("requires a thread list!")
+-				sys.exit(2)
+-			try:
+-				tuna.threads_set_priority(thread_list, a, affect_children)
+-			except (SystemError, OSError) as err: # (3, 'No such process') old python-schedutils incorrectly raised SystemError
+-				print "tuna: %s" % err
+-				sys.exit(2)
++				# For backward compatibility
++				p_waiting_action = True
++			else:
++				try:
++					tuna.threads_set_priority(thread_list, a, affect_children)
++				except (SystemError, OSError) as err: # (3, 'No such process') old python-schedutils incorrectly raised SystemError
++					print "tuna: %s" % err
++					sys.exit(2)
+ 		elif o in ("-P", "--show_threads"):
+ 			# If the user specified process names that weren't
+ 			# resolved to pids, don't show all threads.
+@@ -637,6 +651,40 @@ def main():
+ 				sys.exit(2)
+ 			for tid in thread_list:
+ 				thread_help(tid)
++		elif o in ("-r", "--run"):
++			# If -p is set, it will be consumed. So, no backward compatible
++			# error handling action must be taken.
++			p_waiting_action = False
++
++			# pick_op() before run the command: to remove the prefix
++			# + or - from command line.
++			(op, a) = pick_op(a)
++
++			# In order to include the new process, it must run
++			# the command first, and then get the list of pids,
++			tuna.run_command(a, policy, rtprio, cpu_list)
++
++			op_list = reduce(lambda i, j: i + j,
++					 map(thread_mapper, a.split(",")))
++			op_list = list(set(op_list))
++			thread_list = do_list_op(op, thread_list, op_list)
++
++			# Check if a process name was especified and no
++			# threads was found, which would result in an empty
++			# thread list, i.e. we would print all the threads
++			# in the system when we should print nothing.
++			if not op_list and type(a) == type(''):
++				thread_list_str = do_list_op(op, thread_list_str,
++							     a.split(","))
++			if not op:
++				irq_list = None
++
++	# For backward compatibility: when -p used to be only an Action, it
++	# used to exit(2) if no action was taken (i.e. if no threads_list
++	# was set).
++	if p_waiting_action:
++		print ("tuna: -p ") + _("requires a thread list!")
++		sys.exit(2)
+ 
+ 	if run_gui:
+ 		try:
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 646b8dfa700f..9aab16a409d2 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -1,7 +1,7 @@
+ # -*- python -*-
+ # -*- coding: utf-8 -*-
+ 
+-import copy, ethtool, os, procfs, re, schedutils
++import copy, ethtool, os, procfs, re, schedutils, sys, shlex
+ import help, fnmatch
+ from procfs import utilist
+ 
+@@ -498,6 +498,22 @@ def get_irq_affinity_text(irqs, irq):
+ 		# needs root prio to read /proc/irq/<NUM>/smp_affinity
+ 		return ""
+ 
++def get_policy_and_rtprio(parm):
++	parms = parm.split(":")
++	rtprio = 0
++	policy = None
++	if parms[0].upper() in ["OTHER", "BATCH", "IDLE", "FIFO", "RR"]:
++		policy = schedutils.schedfromstr("SCHED_%s" % parms[0].upper())
++		if len(parms) > 1:
++			rtprio = int(parms[1])
++		elif parms[0].upper() in ["FIFO", "RR"]:
++			rtprio = 1
++	elif parms[0].isdigit():
++		rtprio = int(parms[0])
++	else:
++		raise ValueError
++	return (policy, rtprio)
++
+ def thread_filtered(tid, cpus_filtered, show_kthreads, show_uthreads):
+ 	if cpus_filtered:
+ 		try:
+@@ -532,18 +548,9 @@ def thread_set_priority(tid, policy, rtprio):
+ 	schedutils.set_scheduler(tid, policy, rtprio)
+ 
+ def threads_set_priority(tids, parm, affect_children = False):
+-	parms = parm.split(":")
+-	rtprio = 0
+-	policy = None
+-	if parms[0].upper() in ["OTHER", "BATCH", "IDLE", "FIFO", "RR"]:
+-		policy = schedutils.schedfromstr("SCHED_%s" % parms[0].upper())
+-		if len(parms) > 1:
+-			rtprio = int(parms[1])
+-		elif parms[0].upper() in ["FIFO", "RR"]:
+-			rtprio = 1
+-	elif parms[0].isdigit():
+-		rtprio = int(parms[0])
+-	else:
++	try:
++		(policy, rtprio) = get_policy_and_rtprio(parm)
++	except ValueError:
+ 		print "tuna: " + _("\"%s\" is unsupported priority value!") % parms[0]
+ 		return
+ 
+@@ -602,6 +609,32 @@ def get_kthread_sched_tunings(proc = None):
+ 
+ 	return kthreads
+ 
++def run_command(cmd, policy, rtprio, cpu_list):
++	newpid = os.fork()
++	if newpid == 0:
++		cmd_list = shlex.split(cmd)
++		pid = os.getpid()
++		if rtprio:
++			try:
++				thread_set_priority(pid, policy, rtprio)
++			except (SystemError, OSError) as err:
++				print "tuna: %s" % err
++				sys.exit(2)
++		if cpu_list:
++			try:
++				schedutils.set_affinity(pid, cpu_list)
++			except (SystemError, OSError) as err:
++				print "tuna: %s" % err
++				sys.exit(2)
++
++		try:
++			os.execvp(cmd_list[0], cmd_list)
++		except (SystemError, OSError) as err:
++			print "tuna: %s" % err
++			sys.exit(2)
++	else:
++		os.waitpid(newpid, 0);
++
+ def generate_rtgroups(filename, kthreads, nr_cpus):
+ 	f = file(filename, "w")
+ 	f.write('''# Generated by tuna
+-- 
+2.4.11
+

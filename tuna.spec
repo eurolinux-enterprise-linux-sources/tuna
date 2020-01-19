@@ -2,34 +2,19 @@
 %{!?python_ver: %define python_ver %(%{__python} -c "import sys ; print sys.version[:3]")}
 
 Name: tuna
-Version: 0.11.1
-Release: 12%{?dist}
+Version: 0.13
+Release: 5%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
-Source: http://userweb.kernel.org/~acme/tuna/%{name}-%{version}.tar.bz2
+Source: https://www.kernel.org/pub/software/utils/tuna/%{name}-%{version}.tar.xz
 
-Patch1: spec-Mark-configuration-files-with-config.patch
-Patch2: docs-Remove-stray-a.patch
-Patch3: CLI-fix-ps_show_thread-call-with-bad-args-count.patch
-Patch4: CLI-fix-traceback-where-enter-p-policy-without-prio.patch
-Patch5: CLI-fix-traceback-due-unavailable-display.patch
-Patch6: tuna-modified-sysctl-settings-in-example.conf.patch
-Patch7: CLI-fix-traceback-when-p-is-used-with-unsupported-va.patch
-Patch8: Add-a-tuna.desktop-file.patch
-Patch9: CLI-Introduce-nohz_full-N-entity.patch
-Patch10: tuna-config-Fix-pygtk-import.patch
-Patch11: tuna-Make-isolate-include-operations-affect-proc-irq.patch
-Patch12: tuna-Decide-whether-to-isolate-a-thread-based-on-PF_.patch
-Patch13: tuna-Fix-race-in-is_hardirq_handler.patch
-Patch14: CLI-Do-not-show-column-headers-when-not-outputting-t.patch
-Patch15: Fix-behavior-for-dot-inside-proc-sys-path.patch
-Patch16: Correct-a-typo-in-the-net.ipv4.ipfrag_time-help-stri.patch
-Patch17: spec-Show-where-the-original-source-comes-from-in-co.patch
-Patch18: tuna-fix-the-check-of-PF_NO_SETAFFINITY-flag-for-thr.patch
+Patch1: tuna-cpuview.py-Omit-offline-cpus-in-socket_ids-list.patch
+Patch2: display-usage-instead-of-traceback-when-c-missing-args.patch
+Patch3: CLI-start-a-process-from-tuna.patch
+Patch4: docs-upgrade-tuna.8-man-page-with-option-r.patch
 
-URL: http://userweb.kernel.org/~acme/tuna/
-# Real source is now at git://git.kernel.org/pub/scm/utils/tuna/tuna
+URL: https://git.kernel.org/pub/scm/utils/tuna/tuna.git
 BuildArch: noarch
 BuildRequires: python-devel, gettext, desktop-file-utils
 Requires: python-ethtool
@@ -70,21 +55,6 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %patch2 -p1
 %patch3 -p1
 %patch4 -p1
-%patch5 -p1
-%patch6 -p1
-%patch7 -p1
-%patch8 -p1
-%patch9 -p1
-%patch10 -p1
-%patch11 -p1
-%patch12 -p1
-%patch13 -p1
-%patch14 -p1
-%patch15 -p1
-%patch16 -p1
-%patch17 -p1
-%patch18 -p1
-
 
 %build
 %{__python} setup.py build
@@ -139,9 +109,29 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
-* Tue Dec 22 2015 John Kacur - 0.11.1-12
-- rebuilt for rhel-7.2.z
-Resolves: rhbz#1293353
+* Mon Jun 13 2016 John Kacur - 0.13-5
+- Rebuild to document
+  tuna thows an exception instead of an error message when sched_setaffinity returns EINVAL
+  This was actually fixed in v0.13-1
+Resolves: rhbz#1290445
+
+* Mon May 30 2016 John Kacur - 0.13-4
+- CLI-start-a-process-from-tuna
+- docs: upgrade tuna.8 man page with option -r
+Resolves: rhbz#1235829
+
+* Mon May 30 2016 John Kacur - 0.13-3
+- Display usage instead of traceback when -c missing args or args is incorrect
+Resolves: rhbz#1268287
+
+* Mon May 30 2016 John Kacur - 0.13-2
+- tuna: cpuview.py: Omit offline cpus in socket_ids list
+Resolves: rhbz#1036156
+
+* Tue May 24 2016 John Kacur - 0.13-1
+- Upgrade to v0.13
+- Remove patches that are included in 0.13
+Resolves: rhbz#1235828
 
 * Mon Dec 21 2015 John Kacur - 0.11.1-11
 - tuna-fix-the-check-of-PF_NO_SETAFFINITY-flag-for-thr.patch

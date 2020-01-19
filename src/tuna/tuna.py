@@ -3,6 +3,7 @@
 
 import copy, ethtool, os, procfs, re, schedutils
 import help, fnmatch
+from procfs import utilist
 
 try:
 	set
@@ -92,9 +93,10 @@ def has_threaded_irqs(ps):
 	irq_re = re.compile("(irq/[0-9]+-.+|IRQ-[0-9]+)")
 	return len(ps.find_by_regex(irq_re)) > 0
 
-def set_irq_affinity(irq, bitmasklist):
+def set_irq_affinity_filename(filename, bitmasklist):
+	pathname="/proc/irq/%s" % filename
+	f = file(pathname, "w")
 	text = ",".join(map(lambda a: "%x" % a, bitmasklist))
-	f = file("/proc/irq/%d/smp_affinity" % irq, "w")
 	f.write("%s\n" % text)
 	try:
 		f.close()
@@ -102,6 +104,9 @@ def set_irq_affinity(irq, bitmasklist):
 		# This happens with IRQ 0, for instance
 		return False
 	return True
+
+def set_irq_affinity(irq, bitmasklist):
+	return set_irq_affinity_filename("%d/smp_affinity" % irq, bitmasklist)
 
 def cpustring_to_list(cpustr):
 	"""Convert a string of numbers to an integer list.
@@ -161,10 +166,29 @@ def list_to_cpustring(l):
 # FIXME: move to python-linux-procfs
 def is_hardirq_handler(self, pid):
 		PF_HARDIRQ = 0x08000000
-		if not self.processes.has_key(pid):
+		try:
+			return int(self.processes[pid]["stat"]["flags"]) & \
+				PF_HARDIRQ and True or False
+		except:
 			return False
-                return int(self.processes[pid]["stat"]["flags"]) & \
-                       PF_HARDIRQ and True or False
+
+# FIXME: move to python-linux-procfs
+def cannot_set_affinity(self, pid):
+		PF_NO_SETAFFINITY = 0x04000000
+		try:
+			return int(self.processes[pid]["stat"]["flags"]) & \
+				PF_NO_SETAFFINITY and True or False
+		except:
+			return True
+
+# FIXME: move to python-linux-procfs
+def cannot_set_thread_affinity(self, pid, tid):
+		PF_NO_SETAFFINITY = 0x04000000
+		try:
+			return int(self.processes[pid].threads[tid]["stat"]["flags"]) & \
+				PF_NO_SETAFFINITY and True or False
+		except:
+			return True
 
 def move_threads_to_cpu(cpus, pid_list, set_affinity_warning = None,
 			spread = False):
@@ -247,6 +271,9 @@ def move_threads_to_cpu(cpus, pid_list, set_affinity_warning = None,
 			if e[0] == 3:
 				# process died
 				continue
+			elif e[0] == 22: # (22, EINVAL - unmovable thread)
+				print "thread %(pid)d cannot be moved as requested" %{'pid':pid}
+				continue
 			raise e
 	return changed
 
@@ -307,12 +334,20 @@ def affinity_remove_cpus(affinity, cpus, nr_cpus):
 		affinity = list(set(affinity) - set(cpus))
 	return affinity
 
+# Shound be moved to python_linux_procfs.interrupts, shared with interrupts.parse_affinity, etc.
+def parse_irq_affinity_filename(filename, nr_cpus):
+	f = file("/proc/irq/%s" % filename)
+	line = f.readline()
+	f.close()
+	return utilist.bitmasklist(line, nr_cpus)
+
+
 def isolate_cpus(cpus, nr_cpus):
 	ps = procfs.pidstats()
 	ps.reload_threads()
 	previous_pid_affinities = {}
 	for pid in ps.keys():
-		if iskthread(pid):
+		if cannot_set_affinity(ps, pid):
 			continue
 		try:
 			affinity = schedutils.get_affinity(pid)
@@ -334,7 +369,7 @@ def isolate_cpus(cpus, nr_cpus):
 			continue
 		threads = ps[pid]["threads"]
 		for tid in threads.keys():
-			if iskthread(tid):
+			if cannot_set_thread_affinity(ps, pid, tid):
 				continue
 			try:
 				affinity = schedutils.get_affinity(tid)
@@ -369,6 +404,10 @@ def isolate_cpus(cpus, nr_cpus):
 					 procfs.hexbitmask(affinity,
 							   nr_cpus))
 
+	affinity = parse_irq_affinity_filename("default_smp_affinity", nr_cpus)
+	affinity = affinity_remove_cpus(affinity, cpus, nr_cpus)
+	set_irq_affinity_filename("default_smp_affinity", procfs.hexbitmask(affinity, nr_cpus))
+
 	return (previous_pid_affinities, previous_irq_affinities)
 
 def include_cpus(cpus, nr_cpus):
@@ -376,7 +415,7 @@ def include_cpus(cpus, nr_cpus):
 	ps.reload_threads()
 	previous_pid_affinities = {}
 	for pid in ps.keys():
-		if iskthread(pid):
+		if cannot_set_affinity(ps, pid):
 			continue
 		try:
 			affinity = schedutils.get_affinity(pid)
@@ -398,7 +437,7 @@ def include_cpus(cpus, nr_cpus):
 			continue
 		threads = ps[pid]["threads"]
 		for tid in threads.keys():
-			if iskthread(tid):
+			if cannot_set_thread_affinity(ps, pid, tid):
 				continue
 			try:
 				affinity = schedutils.get_affinity(tid)
@@ -431,6 +470,10 @@ def include_cpus(cpus, nr_cpus):
 			affinity = list(set(affinity + cpus))
 			set_irq_affinity(int(irq),
 					 procfs.hexbitmask(affinity, nr_cpus))
+
+	affinity = parse_irq_affinity_filename("default_smp_affinity", nr_cpus)
+	affinity = list(set(affinity + cpus))
+	set_irq_affinity_filename("default_smp_affinity", procfs.hexbitmask(affinity, nr_cpus))
 
 	return (previous_pid_affinities, previous_irq_affinities)
 
@@ -490,12 +533,19 @@ def thread_set_priority(tid, policy, rtprio):
 
 def threads_set_priority(tids, parm, affect_children = False):
 	parms = parm.split(":")
+	rtprio = 0
 	policy = None
-	if len(parms) != 1:
+	if parms[0].upper() in ["OTHER", "BATCH", "IDLE", "FIFO", "RR"]:
 		policy = schedutils.schedfromstr("SCHED_%s" % parms[0].upper())
-		rtprio = int(parms[1])
-	else:
+		if len(parms) > 1:
+			rtprio = int(parms[1])
+		elif parms[0].upper() in ["FIFO", "RR"]:
+			rtprio = 1
+	elif parms[0].isdigit():
 		rtprio = int(parms[0])
+	else:
+		print "tuna: " + _("\"%s\" is unsupported priority value!") % parms[0]
+		return
 
 	for tid in tids:
 		try:
@@ -615,3 +665,7 @@ def generate_rtgroups(filename, kthreads, nr_cpus):
 						   schedutils.schedstr(kt.policy)[6].lower(),
 						   kt.rtprio, mask, regex))
 	f.close()
+
+
+def nohz_full_list():
+	return [ int(cpu) for cpu in procfs.cmdline().options["nohz_full"].split(",") ]

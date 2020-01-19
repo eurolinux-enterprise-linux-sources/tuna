@@ -2,7 +2,7 @@
 %{!?python_ver: %define python_ver %(%{__python} -c "import sys ; print sys.version[:3]")}
 
 Name: tuna
-Version: 0.11.1
+Version: 0.13
 Release: 1%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
@@ -10,7 +10,7 @@ Group: Applications/System
 Source: http://userweb.kernel.org/~acme/tuna/%{name}-%{version}.tar.bz2
 URL: http://userweb.kernel.org/~acme/tuna/
 BuildArch: noarch
-BuildRequires: python-devel, gettext
+BuildRequires: python-devel, gettext, desktop-file-utils
 Requires: python-ethtool
 Requires: python-linux-procfs >= 0.4.5
 Requires: python-schedutils >= 0.2
@@ -63,6 +63,7 @@ install -p -m644 docs/tuna.8 %{buildroot}/%{_mandir}/man8/
 install -p -m644 etc/tuna/example.conf %{buildroot}/%{_sysconfdir}/tuna/
 install -p -m644 etc/tuna.conf %{buildroot}/%{_sysconfdir}/
 install -p -m644 org.tuna.policy %{buildroot}/%{_datadir}/polkit-1/actions/
+desktop-file-install --dir=%{buildroot}/%{_datadir}/applications tuna.desktop
 
 # l10n-ed message catalogues
 for lng in `cat po/LINGUAS`; do
@@ -89,6 +90,7 @@ rm -rf %{buildroot}
 %{_sysconfdir}/tuna.conf
 %{_sysconfdir}/tuna/*
 %{_datadir}/polkit-1/actions/org.tuna.policy
+%{_datadir}/applications/tuna.desktop
 
 %files -n oscilloscope
 %defattr(-,root,root,-)
