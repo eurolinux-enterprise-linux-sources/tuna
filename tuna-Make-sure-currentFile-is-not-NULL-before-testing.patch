@@ -1,0 +1,28 @@
+From 64b01e239dcb7e03563d6151102316bef20a5bb9 Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Wed, 30 Jan 2019 16:31:08 +0100
+Subject: [PATCH] tuna: Make sure currentFile is not NULL before testing
+
+Make sure currentFile is assigned a value before testing it.
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/gui/profileview.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/tuna/gui/profileview.py b/tuna/gui/profileview.py
+index fe670bfca3c7..fc243995621b 100644
+--- a/tuna/gui/profileview.py
++++ b/tuna/gui/profileview.py
+@@ -332,6 +332,8 @@ class profileview:
+ 			if self.setProfileFileList():
+ 				self.configFileTree.set_cursor(0)
+ 				currentFile = self.get_current_tree_selection()
++                        else:
++                                currentFile = ''
+ 			if self.config.checkConfigFile(self.config.config['root'] + currentFile) == '':
+ 				self.commonview.updateCommonView()
+ 				return True
+-- 
+2.20.1
+

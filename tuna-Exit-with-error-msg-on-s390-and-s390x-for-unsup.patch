@@ -1,0 +1,56 @@
+From 1202ad0fdee7d46a7c0a6a6263bb2efd713f8cf8 Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Thu, 14 Mar 2019 17:14:30 +0100
+Subject: [PATCH 5/5] tuna: Exit with error msg on s390 and s390x for
+ unsupported irq ops
+
+On s390 and s390x any operations involving irqs will fail.
+Try to exit cleanly with an error message that these operations are
+unsupported on s390 and s390x
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/tuna.py | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index eae0408c2fe7..42db4cfcee3f 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -3,6 +3,7 @@
+ 
+ import copy, ethtool, errno, os, procfs, re, schedutils, sys, shlex
+ import help, fnmatch
++import platform
+ from procfs import utilist
+ 
+ try:
+@@ -334,9 +335,24 @@ def affinity_remove_cpus(affinity, cpus, nr_cpus):
+ 		affinity = list(set(affinity) - set(cpus))
+ 	return affinity
+ 
++# True if machine is s390 or s390x
++def is_s390():
++        machine = platform.machine()
++        if re.search('s390', machine):
++                return True
++        else:
++                return False
++
+ # Shound be moved to python_linux_procfs.interrupts, shared with interrupts.parse_affinity, etc.
+ def parse_irq_affinity_filename(filename, nr_cpus):
+-	f = file("/proc/irq/%s" % filename)
++        try:
++	        f = open("/proc/irq/%s" % filename)
++        except IOError as err:
++                if is_s390():
++                        print >> sys.stderr, "This operation is not supported on s390"
++                        print("tuna: %s" % err)
++                        sys.exit(2)
++
+ 	line = f.readline()
+ 	f.close()
+ 	return utilist.bitmasklist(line, nr_cpus)
+-- 
+2.20.1
+

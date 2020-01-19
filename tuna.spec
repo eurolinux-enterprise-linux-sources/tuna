@@ -3,7 +3,7 @@
 
 Name: tuna
 Version: 0.13
-Release: 6%{?dist}
+Release: 9%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
@@ -15,6 +15,9 @@ Patch3: CLI-start-a-process-from-tuna.patch
 Patch4: docs-upgrade-tuna.8-man-page-with-option-r.patch
 Patch5: tuna-Use-errno-codes-instead-of-numbers.patch
 Patch6: tuna-isolate_cpus-exit-with-a-message.patch
+Patch7: tuna-Make-sure-currentFile-is-not-NULL-before-testing.patch
+Patch8: tuna-fix-undefined-global-name-stderr.patch
+Patch9: tuna-Exit-with-error-msg-on-s390-and-s390x-for-unsup.patch
 
 URL: https://git.kernel.org/pub/scm/utils/tuna/tuna.git
 BuildArch: noarch
@@ -59,6 +62,9 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %patch4 -p1
 %patch5 -p1
 %patch6 -p1
+%patch7 -p1
+%patch8 -p1
+%patch9 -p1
 
 %build
 %{__python} setup.py build
@@ -113,6 +119,18 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
+* Thu Mar 14 2019 John Kacur <jkacur@redhat.com> - 0.13-9
+- tuna: Exit with error msg on s390 and s390x for unsupported irq ops
+Resolves: rhbz#1637910
+
+* Thu Jan 31 2019 John Kacur <jkacur@redhat.com> - 0.13-8
+- tuna - Fix undefined global name stderr
+Resolves: rhbz#1671285
+
+* Wed Jan 30 2019 John Kacur - 0.13-7
+- tuna: profileview: Make sure currentFile has a value before using it.
+Resolves: rhbz#1526445
+
 * Wed Sep 13 2017 John Kacur - 0.13-6
 - Use errno codes instead of plain numbers
 - Exit with a message instead of a traceback in isolate_cpus

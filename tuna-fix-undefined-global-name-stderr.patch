@@ -1,0 +1,28 @@
+From 2872033ee669c130d2c5b630915120f782f3f33c Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Thu, 31 Jan 2019 16:15:34 +0100
+Subject: [PATCH] tuna: fix undefined global name stderr
+
+Fix undefined global name stderr. Should be sys.stderr
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/tuna.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 213bbf667caf..eae0408c2fe7 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -272,7 +272,7 @@ def move_threads_to_cpu(cpus, pid_list, set_affinity_warning = None,
+ 				# process died
+ 				continue
+                         elif e[0] == errno.EINVAL: # unmovable thread)
+-				print >> stderr, "thread %(pid)d cannot be moved as requested" %{'pid':pid}
++				print >> sys.stderr, "thread %(pid)d cannot be moved as requested" %{'pid':pid}
+ 				continue
+ 			raise e
+ 	return changed
+-- 
+2.20.1
+
