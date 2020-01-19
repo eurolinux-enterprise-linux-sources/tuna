@@ -3,7 +3,7 @@
 
 Name: tuna
 Version: 0.11.1
-Release: 10%{?dist}
+Release: 12%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
@@ -26,6 +26,7 @@ Patch14: CLI-Do-not-show-column-headers-when-not-outputting-t.patch
 Patch15: Fix-behavior-for-dot-inside-proc-sys-path.patch
 Patch16: Correct-a-typo-in-the-net.ipv4.ipfrag_time-help-stri.patch
 Patch17: spec-Show-where-the-original-source-comes-from-in-co.patch
+Patch18: tuna-fix-the-check-of-PF_NO_SETAFFINITY-flag-for-thr.patch
 
 URL: http://userweb.kernel.org/~acme/tuna/
 # Real source is now at git://git.kernel.org/pub/scm/utils/tuna/tuna
@@ -82,6 +83,7 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %patch15 -p1
 %patch16 -p1
 %patch17 -p1
+%patch18 -p1
 
 
 %build
@@ -137,6 +139,14 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
+* Tue Dec 22 2015 John Kacur - 0.11.1-12
+- rebuilt for rhel-7.2.z
+Resolves: rhbz#1293353
+
+* Mon Dec 21 2015 John Kacur - 0.11.1-11
+- tuna-fix-the-check-of-PF_NO_SETAFFINITY-flag-for-thr.patch
+Resolves: rhbz#1286221
+
 * Thu Jun 25 2015 John Kacur <jkacur@redhat.com> - 0.11.1-10
 - dropped the git housekeeping patch, not relevant here
 - docs-Remove-stray-a.patch
