@@ -3,7 +3,7 @@
 
 Name: tuna
 Version: 0.13
-Release: 5%{?dist}
+Release: 6%{?dist}
 License: GPLv2
 Summary: Application tuning GUI & command line utility
 Group: Applications/System
@@ -13,6 +13,8 @@ Patch1: tuna-cpuview.py-Omit-offline-cpus-in-socket_ids-list.patch
 Patch2: display-usage-instead-of-traceback-when-c-missing-args.patch
 Patch3: CLI-start-a-process-from-tuna.patch
 Patch4: docs-upgrade-tuna.8-man-page-with-option-r.patch
+Patch5: tuna-Use-errno-codes-instead-of-numbers.patch
+Patch6: tuna-isolate_cpus-exit-with-a-message.patch
 
 URL: https://git.kernel.org/pub/scm/utils/tuna/tuna.git
 BuildArch: noarch
@@ -55,6 +57,8 @@ priority is changed, be it using tuna or plain chrt & taskset.
 %patch2 -p1
 %patch3 -p1
 %patch4 -p1
+%patch5 -p1
+%patch6 -p1
 
 %build
 %{__python} setup.py build
@@ -109,6 +113,11 @@ rm -rf %{buildroot}
 %doc docs/oscilloscope+tuna.pdf
 
 %changelog
+* Wed Sep 13 2017 John Kacur - 0.13-6
+- Use errno codes instead of plain numbers
+- Exit with a message instead of a traceback in isolate_cpus
+Resolves: rhbz#1472840
+
 * Mon Jun 13 2016 John Kacur - 0.13-5
 - Rebuild to document
   tuna thows an exception instead of an error message when sched_setaffinity returns EINVAL

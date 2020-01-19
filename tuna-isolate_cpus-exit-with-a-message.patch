@@ -1,0 +1,69 @@
+From 048250c4e0469f5ab3b6230092e1ce40b6b148c6 Mon Sep 17 00:00:00 2001
+From: John Kacur <jkacur@redhat.com>
+Date: Wed, 13 Sep 2017 00:39:08 +0100
+Subject: [PATCH 2/2] tuna: isolate_cpus - exit with a message instead of a
+ traceback
+
+isolate_cpus can create a traceback if passed an illegal cpuset
+If this happens, exit with a message instead of a traceback
+
+Signed-off-by: John Kacur <jkacur@redhat.com>
+---
+ tuna/tuna.py | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/tuna/tuna.py b/tuna/tuna.py
+index 13b3743e8d06..1ed21353ab48 100755
+--- a/tuna/tuna.py
++++ b/tuna/tuna.py
+@@ -343,6 +343,7 @@ def parse_irq_affinity_filename(filename, nr_cpus):
+ 
+ 
+ def isolate_cpus(cpus, nr_cpus):
++        fname = sys._getframe(  ).f_code.co_name # Function name
+ 	ps = procfs.pidstats()
+ 	ps.reload_threads()
+ 	previous_pid_affinities = {}
+@@ -354,6 +355,9 @@ def isolate_cpus(cpus, nr_cpus):
+ 		except (SystemError, OSError) as e: # old python-schedutils incorrectly raised SystemError
+ 			if e[0] == errno.ESRCH:
+ 				continue
++                        elif e[0] == errno.EINVAL:
++                            print >> sys.stderr, "Function:", fname, ",", e.strerror
++                            sys.exit(2)
+ 			raise e
+ 		if set(affinity).intersection(set(cpus)):
+ 			previous_pid_affinities[pid] = copy.copy(affinity)
+@@ -363,6 +367,9 @@ def isolate_cpus(cpus, nr_cpus):
+ 			except (SystemError, OSError) as e: # old python-schedutils incorrectly raised SystemError
+ 				if e[0] == errno.ESRCH:
+ 					continue
++                                elif e[0] == errno.EINVAL:
++                                    print >> sys.stderr, "Function:", fname, ",", e.strerror
++                                    sys.exit(2)
+ 				raise e
+ 
+ 		if not ps[pid].has_key("threads"):
+@@ -376,6 +383,9 @@ def isolate_cpus(cpus, nr_cpus):
+ 			except (SystemError, OSError) as e: # old python-schedutils incorrectly raised SystemError
+ 				if e[0] == errno.ESRCH:
+ 					continue
++                                elif e[0] == errno.EINVAL:
++                                    print >> sys.stderr, "Function:", fname, ",", e.strerror
++                                    sys.exit(2)
+ 				raise e
+ 			if set(affinity).intersection(set(cpus)):
+ 				previous_pid_affinities[tid] = copy.copy(affinity)
+@@ -385,6 +395,9 @@ def isolate_cpus(cpus, nr_cpus):
+ 				except (SystemError, OSError) as e: # old python-schedutils incorrectly raised SystemError
+ 					if e[0] == errno.ESRCH:
+ 						continue
++                                        elif e[0] == errno.EINVAL:
++                                            print >> sys.stderr, "Function:", fname, ",", e.strerror
++                                            sys.exit(2)
+ 					raise e
+ 
+ 	del ps
+-- 
+2.9.5
+
